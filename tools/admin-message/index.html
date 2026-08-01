@@ -1,0 +1,97 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>行政訊息助手｜MUMING WorkKit</title>
+  <meta name="description" content="行政訊息助手可產生催交資料、報到通知與會議通知，並依對象與語氣調整訊息。">
+  <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/admin-message/">
+  <meta property="og:title" content="行政訊息助手｜MUMING WorkKit">
+  <meta property="og:description" content="快速產生可複製的行政通知訊息。">
+  <meta property="og:type" content="website">
+  <link rel="manifest" href="../../manifest.webmanifest">
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <meta name="theme-color" content="#0e3b32">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要內容</a>
+<header class="site-header">
+  <div class="container nav">
+    <a class="brand" href="../../index.html"><span class="brand-mark">WK</span><span>MUMING WorkKit<small>牧茗產業工具平台</small></span></a>
+    <button class="menu-toggle" data-menu-toggle aria-label="開啟選單" aria-expanded="false"><span></span><span></span><span></span></button>
+    <nav class="nav-links" data-nav-menu>
+      <a href="../../index.html">首頁</a>
+      <a href="../../tools.html">工具中心</a>
+      <a href="../../industries.html">產業工具包</a>
+      <a href="../../about.html">關於平台</a>
+    </nav>
+  </div>
+</header>
+<main id="main">
+  <section class="page-hero tool-page-hero">
+    <div class="container">
+      <p class="eyebrow">Free tool · message</p>
+      <h1>行政訊息助手</h1>
+      <p class="lead">產生催交資料、報到通知與會議通知，適合 LINE、Email 或內部系統通知使用。</p>
+      <div class="utility-links"><a class="button button-outline" href="../../tools.html">返回工具中心</a><a class="button button-outline" href="../../index.html">返回平台首頁</a></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container tool-layout">
+      <form class="form-panel" data-admin-form>
+        <p class="eyebrow">Input</p>
+        <h2>填寫資料</h2>
+        <div class="field"><label>訊息情境</label><div class="segmented"><button type="button" class="is-active" data-scenario="催交資料">催交資料</button><button type="button" data-scenario="報到通知">報到通知</button><button type="button" data-scenario="會議通知">會議通知</button></div></div>
+        <div class="field"><label for="audience">訊息對象</label><select class="control" id="audience" name="audience"><option>同事</option><option>員工</option><option>主管</option><option>新人</option><option>客戶</option><option>廠商</option><option>全體同仁</option></select></div>
+        <div class="field"><label>語氣</label><div class="segmented"><button type="button" class="is-active" data-tone="清楚正式">清楚正式</button><button type="button" data-tone="親切溫和">親切溫和</button><button type="button" data-tone="簡短直接">簡短直接</button><button type="button" data-tone="禮貌提醒">禮貌提醒</button><button type="button" data-tone="主管口吻">主管口吻</button><button type="button" data-tone="緊急明確">緊急明確</button></div></div>
+        <div class="field"><label for="item">資料、事項或會議主題</label><input class="control" id="item" name="item" placeholder="例如：身分證影本、報到文件、月會"></div>
+        <div class="field"><label for="deadline">期限、報到時間或會議時間</label><input class="control" id="deadline" name="deadline" placeholder="例如：8/10 中午 12:00 前"></div>
+        <div class="field"><label for="method">催交資料的繳交方式</label><select class="control" id="method" name="method"><option>LINE 傳送</option><option>Email 回覆</option><option>紙本繳交</option><option>現場繳交</option><option>公司系統上傳</option><option>雲端連結上傳</option><option>交給指定聯絡人</option><option>其他方式</option></select></div>
+        <div class="field hidden" data-custom-method><label for="custom_method">其他方式說明</label><input class="control" id="custom_method" name="custom_method" placeholder="請輸入自訂繳交方式"></div>
+        <div class="field"><label for="location">地點或連結</label><input class="control" id="location" name="location" placeholder="報到地點、會議室或線上連結"></div>
+        <div class="field"><label for="note">補充說明</label><textarea id="note" name="note" placeholder="例如：若已繳交可忽略本訊息"></textarea></div>
+        <div class="action-row"><button class="button button-primary" type="button" data-generate-message>產生訊息</button><button class="button button-outline" type="button" data-reset-message>重新填寫</button></div>
+      </form>
+      <aside class="preview-panel" aria-label="訊息預覽">
+        <p class="eyebrow">Preview</p>
+        <h2>即時預覽結果</h2>
+        <div class="preview-output" data-message-output aria-live="polite"></div>
+        <div class="action-row"><button class="button button-secondary" type="button" data-copy-message>複製訊息</button><button class="button button-outline" type="button" data-shorten-message>縮短內容</button><button class="button button-outline" type="button" data-soften-message>改親切一點</button><button class="button button-outline" type="button" data-strengthen-message>加強提醒</button></div>
+        <p class="notice">本工具在瀏覽器內產生文字，不需登入、不串 API，也不會儲存你填寫的表單內容。</p>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container grid grid-3">
+      <article class="info-block"><h2>工具用途</h2><p>協助把常見行政通知整理成可直接複製的訊息草稿。</p></article>
+      <article class="info-block"><h2>適用對象</h2><p>行政、人資、主管、顧問、現場管理與需要頻繁通知的人員。</p></article>
+      <article class="info-block"><h2>資料是否會被儲存</h2><p>第一版不儲存表單內容，也不傳送到外部服務。</p></article>
+      <article class="info-block"><h2>使用方法</h2><p>選擇情境與語氣，填入必要資訊，確認右側預覽後複製使用。</p></article>
+      <article class="info-block"><h2>實際範例</h2><p>例如催交員工證件、通知新人報到、提醒客戶參加會議。</p></article>
+      <article class="info-block"><h2>相關工具</h2><p>公司公告產生器、新人報到點檢、多語通知助手仍在測試或規劃中。</p></article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>常見問題</h2>
+      <div class="grid grid-2"><article class="faq-item"><h3>可以直接把訊息發出去嗎？</h3><p>目前只產生文字草稿，需由你自行貼到 LINE、Email 或公司系統。</p></article><article class="faq-item"><h3>會記住我輸入的姓名或公司嗎？</h3><p>不會。第一版不儲存工具表單中的個人或公司資料。</p></article></div>
+      <div class="ad-slot">回報問題入口與未來協助內容版位。第一版可先使用頁尾聯絡信箱。</div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div><strong>由牧茗管理顧問有限公司規劃與開發</strong><p>Mu Ming Management Consulting Co., Ltd.</p><p><a href="#official-site">回到牧茗官網（預留連結）</a></p></div>
+    <nav class="footer-links"><a href="../../about.html">關於平台</a><a href="../../privacy.html">隱私權政策</a><a href="../../terms.html">使用條款</a><a href="mailto:service@example.com">意見回饋</a><a href="mailto:service@example.com">聯絡我們</a></nav>
+  </div>
+</footer>
+<script src="../../assets/js/analytics.js"></script>
+<script src="../../assets/js/main.js"></script>
+</body>
+</html>
+
+

@@ -1,0 +1,12 @@
+{
+  "name": "MUMING WorkKit",
+  "short_name": "WorkKit",
+  "description": "牧茗產業工具平台，提供中小企業與產業工作者可立即使用的工作工具。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f2e8",
+  "theme_color": "#0e3b32",
+  "lang": "zh-Hant",
+  "icons": []
+}

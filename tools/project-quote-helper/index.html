@@ -1,0 +1,151 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>接案報價小幫手｜MUMING WorkKit</title>
+  <meta name="description" content="整理材料、人力與必要支出，快速檢查報價是否完整。">
+  <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/project-quote-helper/">
+  <meta property="og:title" content="接案報價小幫手｜MUMING WorkKit">
+  <meta property="og:description" content="整理材料、人力與必要支出，快速檢查報價是否完整。">
+  <meta property="og:type" content="website">
+  <link rel="manifest" href="../../manifest.webmanifest">
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <link rel="stylesheet" href="tool.css?v=20260801-workorder-complete">
+  <meta name="theme-color" content="#173f35">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要內容</a>
+<header class="site-header pq-site-header">
+  <div class="container nav">
+    <a class="brand" href="../../index.html"><span class="brand-mark">WK</span><span>MUMING WorkKit<small>牧茗產業工具平台</small></span></a>
+    <button class="menu-toggle" data-menu-toggle aria-label="開啟選單" aria-expanded="false"><span></span><span></span><span></span></button>
+    <nav class="nav-links" data-nav-menu>
+      <a href="../../index.html">首頁</a>
+      <a href="../../tools.html">工具中心</a>
+      <a href="../../industries.html">產業工具包</a>
+      <a href="../../about.html">關於平台</a>
+    </nav>
+  </div>
+</header>
+<main id="main" data-project-quote-tool>
+  <section class="pq-work-order">
+    <div class="container pq-sheet">
+      <div class="pq-sheet-head">
+        <div>
+          <p class="pq-pack-label">職人工程工具包</p>
+          <h1>接案報價小幫手</h1>
+          <p class="pq-purpose">公開測試版｜施工估價草稿｜報價前支出檢查｜不等同正式報價單｜不提供市場行情、正式會計、稅務或標準報價建議</p>
+        </div>
+        <span class="pq-stamp" data-risk-level>資料待補</span>
+      </div>
+
+      <div class="pq-mobile-progress" aria-live="polite">
+        <span data-step-label>完整盤點表｜可展開收合</span>
+        <div class="pq-step-track" aria-hidden="true"><i data-step-progress></i></div>
+      </div>
+
+      <div class="pq-layout">
+        <form class="pq-form" data-quote-form>
+          <section class="pq-section pq-step-panel" data-step="1">
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>01</span>工程資料</button></h2>
+            <div class="pq-grid pq-ledger-grid">
+              <div class="field"><label for="project_type">工程類型</label><select class="control" id="project_type" name="project_type" data-project-type></select></div>
+              <div class="field pq-custom-type" data-custom-project-type hidden><label for="custom_project_type">自訂工程類型</label><input class="control" id="custom_project_type" name="custom_project_type" autocomplete="off" placeholder="例如：小型浴室防水修繕"></div>
+              <div class="field"><label for="quote_amount">預計報價金額</label><input class="control" id="quote_amount" name="quote_amount" inputmode="decimal" placeholder="例如：30000" data-money></div>
+              <div class="field"><label for="crew_count">施工人數</label><input class="control" id="crew_count" name="crew_count" inputmode="decimal" placeholder="例如：2" data-number></div>
+              <div class="field"><label for="work_days">預估工作天數</label><input class="control" id="work_days" name="work_days" inputmode="decimal" placeholder="例如：3" data-number></div>
+              <div class="field"><label for="daily_labor_cost">每人每日人力成本</label><input class="control" id="daily_labor_cost" name="daily_labor_cost" inputmode="decimal" placeholder="例如：2500" data-money></div>
+            </div>
+          </section>
+
+          <section class="pq-section pq-step-panel" data-step="2">
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>02</span>主要支出</button></h2>
+            <div class="pq-grid pq-ledger-grid">
+              <div class="field"><label for="material_cost">材料費</label><input class="control" id="material_cost" name="material_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
+              <div class="field"><label for="subcontract_cost">外包費</label><input class="control" id="subcontract_cost" name="subcontract_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
+              <div class="field"><label for="parking_cost">停車費</label><input class="control" id="parking_cost" name="parking_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
+            </div>
+          </section>
+
+          <section class="pq-section pq-step-panel" data-step="3">
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>03</span>其他可能支出</button></h2>
+            <div class="pq-grid pq-ledger-grid">
+              <div class="field"><label for="consumable_cost">耗材費</label><input class="control" id="consumable_cost" name="consumable_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
+              <div class="field"><label for="meal_cost">餐費</label><input class="control" id="meal_cost" name="meal_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
+              <div class="field"><label for="other_cost">其他必要支出</label><input class="control" id="other_cost" name="other_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
+            </div>
+            <div class="pq-feature-box">
+              <h3>工程特徵</h3>
+              <p class="pq-feature-note">勾選後可填寫對應費用；若已包含在人力費或外包費中，可填 0。</p>
+              <div class="pq-checks" data-feature-list></div>
+            </div>
+          </section>
+
+          <div class="pq-actions">
+            <button class="button button-primary" type="button" data-calculate>開始試算</button>
+            <button class="button button-outline" type="button" data-reset>清除全部</button>
+          </div>
+          <p class="notice pq-privacy-note">本工具只在瀏覽器內計算，不保存表單內容，不傳送金額、工程資料或摘要全文。</p>
+        </form>
+
+        <aside class="pq-results pq-step-panel" data-step="4" aria-label="報價檢查結果">
+          <section class="pq-section pq-result-section">
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>04</span>報價檢查結果</button></h2>
+            <div class="pq-result-main" data-main-result></div>
+            <div class="pq-secondary-numbers" data-secondary-numbers></div>
+            <div class="pq-ruler-wrap">
+              <div class="pq-ruler-labels"><span>不足</span><span>接近已估支出</span><span>尚有應變空間</span></div>
+              <div class="pq-ruler" data-ruler><i></i></div>
+              <p>依目前輸入資料顯示，僅供報價前檢查，不代表標準報價。</p>
+            </div>
+            <div class="pq-work-note" data-work-note></div>
+          </section>
+
+          <section class="pq-section pq-cost-section">
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>05</span>支出明細</button></h2>
+            <div class="pq-breakdown" data-breakdown></div>
+          </section>
+
+          <section class="pq-section pq-check-section">
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>06</span>待確認清單</button></h2>
+            <div class="pq-alerts" data-alerts></div>
+          </section>
+
+          <section class="pq-section pq-copy-section">
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>07</span>複製與列印</button></h2>
+            <pre class="pq-copy-text" data-copy-text></pre>
+            <div class="pq-copy-actions">
+              <button class="button button-secondary" type="button" data-copy-summary>複製試算摘要</button>
+              <button class="button button-outline" type="button" data-print>列印結果</button>
+              <button class="button button-outline" type="button" data-share-tool>分享工具網址</button>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <div class="pq-mobile-actions" data-mobile-actions>
+        <button type="button" data-expand-all>展開全部</button><button type="button" data-collapse-costs>收合支出</button><button type="button" class="primary" data-show-result>查看結果</button>
+      </div>
+
+      <section class="pq-feedback" aria-labelledby="feedback-title">
+        <h2 id="feedback-title">這個工具對你有幫助嗎？</h2>
+        <ul>
+          <li>哪個欄位看不懂？</li>
+          <li>還缺哪一項常見費用？</li>
+          <li>這個工具對報價前檢查有沒有幫助？</li>
+        </ul>
+        <a class="button button-outline" href="mailto:muming9000@gmail.com?subject=%E6%8E%A5%E6%A1%88%E5%A0%B1%E5%83%B9%E5%B0%8F%E5%B9%AB%E6%89%8B%E4%BD%BF%E7%94%A8%E5%9B%9E%E9%A5%8B">寄送使用回饋</a>
+      </section>
+    </div>
+  </section>
+</main>
+<footer class="site-footer"><div class="container footer-grid"><div><strong>由牧茗管理顧問有限公司規劃與開發</strong><p>Mu Ming Management Consulting Co., Ltd.</p><p><a href="#official-site">回到牧茗官網（預留連結）</a></p></div><nav class="footer-links"><a href="../../about.html">關於平台</a><a href="../../privacy.html">隱私權政策</a><a href="../../terms.html">使用條款</a><a href="mailto:service@example.com">意見回饋</a><a href="mailto:service@example.com">聯絡我們</a></nav></div></footer>
+<script src="../../assets/js/analytics.js"></script>
+<script src="../../assets/js/main.js"></script>
+<script src="rules.js?v=20260801"></script>
+<script src="tool.js?v=20260801-workorder-complete"></script>
+</body>
+</html>
+
