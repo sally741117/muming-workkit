@@ -1,13 +1,13 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>工具中心｜MUMING WorkKit</title>
-  <meta name="description" content="在 MUMING WorkKit 工具中心搜尋免費、測試版與開發中的產業工作工具。">
+  <title>探索工具｜MUMING WorkKit</title>
+  <meta name="description" content="在 MUMING WorkKit 搜尋行政、工程、多語、文件、計算與流程工具。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools.html">
-  <meta property="og:title" content="工具中心｜MUMING WorkKit">
-  <meta property="og:description" content="像 App 市集一樣探索行政、文件、日期、費用、流程與多語工具。">
+  <meta property="og:title" content="探索工具｜MUMING WorkKit">
+  <meta property="og:description" content="用功能分類與產業篩選快速找到可用工具。">
   <meta property="og:type" content="website">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="assets/css/styles.css">
@@ -29,25 +29,20 @@
   </div>
 </header>
 <main id="main" data-tool-explorer>
-  <section class="market-hero">
-    <div class="container market-panel">
-      <div class="market-header-grid">
-        <div>
-          <p class="eyebrow">Tool marketplace</p>
-          <h1>探索工具</h1>
-          <p class="lead">用搜尋、分類與狀態快速找到可用工具。正式工具可直接開啟，規劃中工具只顯示狀態。</p>
-        </div>
-        <aside class="market-count"><strong data-tool-count>0</strong><span>目前工具</span></aside>
+  <section class="wk-tools-hero">
+    <div class="container">
+      <div class="wk-tools-title">
+        <div><p class="eyebrow">Tool search</p><h1>探索工具</h1><p>先搜尋，再用功能與產業縮小範圍。</p></div>
+        <p class="wk-tool-count">目前共有 <strong data-tool-count>0</strong> 個工具</p>
       </div>
-      <div class="search-box">
-        <div class="search-label"><strong>搜尋工具</strong><span>熱門搜尋：公告、報到、日期、費用、翻譯、流程、文件</span></div>
+      <div class="search-box wk-tools-search">
         <form class="search-form" onsubmit="return false;">
           <input data-tool-search type="search" placeholder="今天想解決什麼工作？" aria-label="搜尋工具">
           <button class="button button-secondary" type="button">搜尋</button>
         </form>
         <div class="search-hints" aria-label="熱門搜尋關鍵字">
-          <button class="chip" data-search-chip type="button">公告</button>
-          <button class="chip" data-search-chip type="button">報到</button>
+          <button class="chip" data-search-chip type="button">報價</button>
+          <button class="chip" data-search-chip type="button">催件</button>
           <button class="chip" data-search-chip type="button">日期</button>
           <button class="chip" data-search-chip type="button">費用</button>
           <button class="chip" data-search-chip type="button">多語</button>
@@ -57,29 +52,31 @@
     </div>
   </section>
 
-  <section class="section-tight">
+  <section class="wk-tool-browser">
     <div class="container">
-      <div class="quick-tabs" aria-label="快捷篩選">
-        <button class="is-active" type="button" data-quick-filter="all">全部工具</button>
-        <button type="button" data-quick-filter="popular">熱門</button>
-        <button type="button" data-quick-filter="latest">最新</button>
-        <button type="button" data-quick-filter="free">免費</button>
-        <button type="button" data-quick-filter="beta">測試版</button>
+      <div class="wk-filter-group">
+        <div class="wk-filter-label"><strong>功能分類</strong><span>先選工作類型</span></div>
+        <div class="tool-tabs wk-function-tabs" aria-label="主要功能分類">
+          <button class="is-active" type="button" data-tool-category="全部工具">全部工具</button>
+          <button type="button" data-tool-category="寫訊息">寫訊息</button>
+          <button type="button" data-tool-category="計算試算">計算試算</button>
+          <button type="button" data-tool-category="文件表單">文件表單</button>
+          <button type="button" data-tool-category="清單流程">清單流程</button>
+          <button type="button" data-tool-category="多語溝通">多語溝通</button>
+        </div>
       </div>
-      <div class="tool-tabs" aria-label="工具分類">
-        <button class="is-active" type="button" data-tool-category="全部">全部</button>
-        <button type="button" data-tool-category="行政">行政</button>
-        <button type="button" data-tool-category="人資">人資</button>
-        <button type="button" data-tool-category="計算">計算</button>
-        <button type="button" data-tool-category="文件">文件</button>
-        <button type="button" data-tool-category="訊息">訊息</button>
-        <button type="button" data-tool-category="流程">流程</button>
-        <button type="button" data-tool-category="多語">多語</button>
-        <button type="button" data-tool-category="外籍人力管理">外籍人力管理</button>
-      </div>
-      <div class="filter-strip">
-        <span class="result-note">顯示 <strong data-result-count>0</strong> 個工具</span>
-        <div class="compact-controls">
+      <div class="wk-filter-strip">
+        <label>產業
+          <select class="control" data-tool-industry>
+            <option>全部產業</option>
+            <option>行政人資</option>
+            <option>工程職人</option>
+            <option>外籍人力</option>
+            <option>工廠管理</option>
+            <option>顧問業務</option>
+          </select>
+        </label>
+        <label>狀態
           <select class="control" data-tool-status aria-label="狀態篩選">
             <option>全部狀態</option>
             <option>免費</option>
@@ -87,20 +84,22 @@
             <option>測試版</option>
             <option>開發中</option>
           </select>
+        </label>
+        <label>排序
           <select class="control" data-tool-sort aria-label="排序">
             <option value="recommended">推薦</option>
             <option value="popular">熱門</option>
             <option value="latest">最新</option>
             <option value="name">名稱</option>
           </select>
-        </div>
+        </label>
+        <span class="result-note">顯示 <strong data-result-count>0</strong> 個工具</span>
       </div>
-      <div class="grid grid-3" data-tool-list></div>
+      <div class="wk-tool-grid" data-tool-list></div>
       <div class="empty-state" data-empty-state hidden>
         <h2>找不到符合條件的工具</h2>
         <p>可以換個關鍵字，或透過意見回饋告訴我們你需要的工作情境。</p>
       </div>
-      <div class="ad-slot">廣告或合作工具推薦版位預留。第一版不放入廣告程式碼。</div>
     </div>
   </section>
 </main>
@@ -110,11 +109,8 @@
     <nav class="footer-links"><a href="about.html">關於平台</a><a href="privacy.html">隱私權政策</a><a href="terms.html">使用條款</a><a href="mailto:muming9000@gmail.com?subject=MUMING%20WorkKit%20使用回饋">意見回饋</a><a href="mailto:muming9000@gmail.com">聯絡我們</a></nav>
   </div>
 </footer>
-<script src="assets/js/tools-data.js?v=20260801"></script>
+<script src="assets/js/tools-data.js?v=20260802-density"></script>
 <script src="assets/js/analytics.js?v=20260801"></script>
-<script src="assets/js/main.js?v=20260801"></script>
+<script src="assets/js/main.js?v=20260802-density"></script>
 </body>
 </html>
-
-
-
