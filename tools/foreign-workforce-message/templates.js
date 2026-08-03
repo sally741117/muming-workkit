@@ -3,7 +3,7 @@
   const languages = loc ? loc.languages : [];
   const tones = { formal: '正式清楚', friendly: '親切自然', brief: '簡短直接' };
   const fieldLabels = {
-    recipient_zh: '中文姓名', recipient_latin: '外語／護照英文姓名', contact_person_zh: '中文聯絡人', contact_person_latin: '外語／英文聯絡人', pickup_person_zh: '中文接送人', pickup_person_latin: '外語／英文接送人',
+    recipient_zh: '中文姓名', recipient_latin: '護照英文姓名／羅馬拼音姓名', contact_person_zh: '中文聯絡人', contact_person_latin: '聯絡人羅馬拼音姓名', pickup_person_zh: '中文接送人', pickup_person_latin: '接送人羅馬拼音姓名',
     onboard_date: '報到日期', onboard_time: '報到時間', onboard_place: '報到地點', documents: '攜帶文件',
     interview_date: '面試日期', interview_time: '面試時間', interview_place: '面試地點', interview_method: '面試方式',
     medical_date: '體檢日期', meet_time: '集合時間', meet_place: '集合地點', medical_place: '體檢地點',

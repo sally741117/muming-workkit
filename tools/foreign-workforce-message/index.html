@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
@@ -11,70 +11,131 @@
   <meta property="og:type" content="website">
   <link rel="manifest" href="../../manifest.webmanifest">
   <link rel="stylesheet" href="../../assets/css/styles.css">
-  <link rel="stylesheet" href="tool.css?v=20260801b">
-  <meta name="theme-color" content="#0e3b32">
+  <link rel="stylesheet" href="tool.css?v=20260802-workkit-shell">
+  <meta name="theme-color" content="#0f3d2e">
   <link rel="icon" href="data:,">
 </head>
-<body>
+<body class="fw-step-page">
 <a class="skip-link" href="#main">跳到主要內容</a>
-<header class="site-header">
-  <div class="container nav">
-    <a class="brand" href="../../index.html"><span class="brand-mark">WK</span><span>MUMING WorkKit<small>牧茗產業工具平台</small></span></a>
-    <button class="menu-toggle" data-menu-toggle aria-label="開啟選單" aria-expanded="false"><span></span><span></span><span></span></button>
-    <nav class="nav-links" data-nav-menu>
-      <a href="../../index.html">首頁</a>
-      <a href="../../tools.html">探索工具</a>
-      <a href="../../industries.html">產業工具包</a>
-      <a href="../../about.html">關於平台</a>
+<input class="tool-drawer-toggle" id="tool-drawer-toggle" type="checkbox" hidden>
+<div class="tool-shell" data-foreign-workforce-tool>
+  <aside class="tool-sidebar" aria-label="工具導覽">
+    <a class="tool-brand" href="../../tools.html">
+      <span class="tool-brand-mark">WK</span>
+      <span>MUMING WorkKit<small>牧茗產業工具平台</small></span>
+    </a>
+    <nav class="tool-nav" aria-label="主要入口">
+      <a class="tool-nav-link is-active" href="../../tools.html"><span>←</span>返回探索工具</a>
+      <a class="tool-nav-link" href="../../tools.html#favorites"><span>☆</span>我的收藏</a>
+      <a class="tool-nav-link" href="../../tools.html#recent"><span>↻</span>最近使用</a>
+      <a class="tool-nav-link" href="../../tools.html?mode=industry"><span>▦</span>產業工具包</a>
+      <a class="tool-nav-link" href="#fw-help"><span>?</span>使用說明</a>
     </nav>
-  </div>
-</header>
-<main id="main" data-foreign-workforce-tool>
-  <section class="page-hero tool-page-hero fw-hero">
-    <div class="container">
-      <p class="eyebrow">Foreign workforce · multilingual message</p>
-      <h1><span class="fw-title-line">外籍人力</span><span class="fw-title-line">多語訊息助手</span></h1>
-      <p class="lead">產生中文與印尼文、越南文、泰文對照的常用工作通知訊息。第一版採固定範本，不串接 AI 或翻譯 API。</p>
-      <div class="utility-links"><a class="button button-outline" href="../../tools.html">返回探索工具</a><button class="button button-outline" type="button" data-share-tool>分享工具網址</button></div>
+    <nav class="tool-nav tool-nav-bottom" aria-label="平台支援">
+      <a class="tool-nav-link" href="../../about.html">關於平台</a>
+      <a class="tool-nav-link" href="mailto:muming9000@gmail.com?subject=MUMING%20WorkKit%20使用協助">聯絡協助</a>
+    </nav>
+  </aside>
+
+  <label class="tool-drawer-backdrop" for="tool-drawer-toggle" aria-hidden="true"></label>
+
+  <main id="main" class="tool-main fw-step-tool">
+    <header class="tool-mobile-bar">
+      <a class="tool-mobile-back" href="../../tools.html" aria-label="返回探索工具">←</a>
+      <div class="tool-mobile-title">
+        <strong>外籍人力多語訊息助手</strong>
+        <span>MUMING WorkKit</span>
+      </div>
+      <label class="tool-mobile-menu" for="tool-drawer-toggle" role="button" aria-label="開啟選單"><span></span><span></span><span></span></label>
+    </header>
+
+    <div class="tool-main-inner">
+      <section class="tool-command-bar" aria-label="工具操作列">
+        <div class="tool-command-title">
+          <a class="tool-return-link" href="../../tools.html">← 返回探索工具</a>
+          <div>
+            <h1>外籍人力多語訊息助手</h1>
+            <span class="fw-status-badge">測試版固定範本</span>
+          </div>
+        </div>
+        <div class="tool-command-actions">
+          <a class="button button-outline button-small" href="../../tools.html#favorites">☆ 收藏工具</a>
+          <button class="button button-outline button-small" type="button" data-share-tool>分享</button>
+          <a class="button button-outline button-small" href="#fw-help">使用說明</a>
+        </div>
+      </section>
+
+      <ol class="fw-step-progress" data-step-progress aria-label="操作步驟">
+        <li class="is-active" data-step-item="1"><span>1</span><strong>選擇情境</strong></li>
+        <li data-step-item="2"><span>2</span><strong>填寫資料</strong></li>
+        <li data-step-item="3"><span>3</span><strong>確認並複製</strong></li>
+      </ol>
+
+      <section class="fw-flow-card" aria-live="polite">
+        <div class="fw-flow-view fw-flow-view--scenario" data-step-view="1">
+          <div class="fw-step-head"><span>Step 1</span><h2>選擇情境</h2><p>選擇適合的固定訊息範本。</p></div>
+          <div class="fw-choice-grid" data-scenario-list></div>
+          <button class="fw-more-toggle" type="button" data-more-scenarios aria-expanded="false" hidden>更多情境</button>
+          <aside class="fw-reminder-card" aria-label="翻譯提醒">
+            <strong>傳送前再次確認</strong>
+            <p>此翻譯為固定範本，外語內容仍待母語確認，傳送前請再次確認姓名、日期、時間與地點。</p>
+          </aside>
+        </div>
+
+        <form class="fw-flow-view fw-flow-view--form" data-step-view="2" data-message-form hidden>
+          <div class="fw-step-head"><span>Step 2</span><h2>填寫必要資料</h2><p data-field-context>只填最少必要欄位即可產生訊息。</p></div>
+          <div class="fw-field-grid" data-dynamic-fields></div>
+          <div class="fw-language-summary">
+            <span>輸出語言：<strong data-language-summary>中文＋印尼文</strong></span>
+            <button type="button" data-language-toggle aria-expanded="false">變更</button>
+          </div>
+          <div class="fw-language-panel" data-language-panel hidden>
+            <label for="language">目標語言</label>
+            <select class="control" id="language" name="language" data-language-select required></select>
+          </div>
+          <details class="fw-more-settings" data-optional-section>
+            <summary>補充資訊（選填）</summary>
+            <div class="field fw-tone-field"><label>語氣 <small>選填</small></label><div class="segmented fw-tone-list" data-tone-list></div></div>
+            <div class="fw-optional-fields" data-optional-fields></div>
+            <div class="fw-check-list" data-optional-phrases></div>
+          </details>
+          <div class="fw-card-actions fw-card-actions--sticky">
+            <button class="button button-outline" type="button" data-prev-step>上一步</button>
+            <button class="button button-primary" type="button" data-generate-message>產生訊息</button>
+          </div>
+        </form>
+
+        <section class="fw-flow-view fw-flow-view--result" data-step-view="3" hidden>
+          <div class="fw-step-head"><span>Step 3</span><h2>確認並複製</h2><p>確認中文與選取語言結果後再複製。</p></div>
+          <div class="fw-translation-warning">翻譯內容仍待母語確認，傳送前請再次確認。</div>
+          <div class="fw-localization-warnings" data-localization-warnings hidden></div>
+          <details class="fw-output-settings">
+            <summary>顯示順序</summary>
+            <div class="fw-display-controls" aria-label="顯示順序"><button class="is-active" type="button" data-display-mode="zh-first">中文在前</button><button type="button" data-display-mode="foreign-first">外語在前</button><button type="button" data-display-mode="foreign-only">只顯示外語</button></div>
+          </details>
+          <div class="fw-result-grid">
+            <article class="fw-message-card" data-result-card="zh"></article>
+            <article class="fw-message-card" data-result-card="foreign"></article>
+          </div>
+          <div class="fw-card-actions">
+            <button class="button button-outline" type="button" data-return-edit>返回修改</button>
+            <button class="button button-secondary" type="button" data-copy-bilingual>一鍵複製全部</button>
+          </div>
+        </section>
+      </section>
+
+      <section id="fw-help" class="fw-help-grid" aria-label="工具說明">
+        <article><h2>固定範本</h2><p>目前使用人工整理的固定訊息範本，不是即時 AI 翻譯。</p></article>
+        <article><h2>支援語言</h2><p>可產生中文搭配印尼文、越南文或泰文的對照訊息。</p></article>
+        <article><h2>資料原則</h2><p>不登入、不串 API、不保存表單、不建立歷史紀錄。</p></article>
+      </section>
     </div>
-  </section>
-  <section class="section">
-    <div class="container tool-layout fw-tool-layout">
-      <form class="form-panel fw-form" data-message-form>
-        <p class="eyebrow">Input</p>
-        <h2>填寫訊息資料</h2>
-        <div class="field"><label>1. 選擇情境</label><div class="fw-choice-grid" data-scenario-list></div></div>
-        <div class="field"><label for="language">2. 選擇語言</label><select class="control" id="language" name="language" data-language-select></select></div>
-        <div class="field"><label>3. 選擇語氣</label><div class="segmented fw-tone-list" data-tone-list></div></div>
-        <div class="field"><label>4. 填寫必要欄位</label><div class="fw-field-grid" data-dynamic-fields></div></div>
-        <div class="field" data-optional-section hidden><label>5. 補充提醒</label><div class="fw-check-list" data-optional-phrases></div></div>
-        <div class="action-row fw-actions"><button class="button button-primary" type="button" data-generate-message>產生訊息</button><button class="button button-outline" type="button" data-clear-message>清除內容</button></div>
-        <p class="notice">本工具只在瀏覽器內組合範本文字，不儲存表單內容，也不會把姓名、地點或訊息全文送入分析。</p>
-      </form>
-      <aside class="preview-panel fw-preview" aria-label="訊息預覽">
-        <div class="fw-preview-head"><div><p class="eyebrow">Preview</p><h2>即時雙語預覽</h2></div><span class="status-pill status-beta" data-review-status>測試版</span></div>
-        <p class="fw-translation-warning">此翻譯目前為測試版本，傳送前請再次確認。</p>
-        <div class="fw-display-controls" aria-label="顯示順序"><button class="is-active" type="button" data-display-mode="zh-first">中文在前</button><button type="button" data-display-mode="foreign-first">外語在前</button><button type="button" data-display-mode="foreign-only">只顯示外語</button></div>
-        <div class="fw-localization-warnings" data-localization-warnings hidden></div>
-        <div class="fw-output" data-message-output aria-live="polite"></div>
-        <div class="action-row fw-copy-actions"><button class="button button-secondary" type="button" data-copy-bilingual>複製雙語</button><button class="button button-outline" type="button" data-copy-foreign>複製外語</button></div>
-      </aside>
-    </div>
-  </section>
-  <section class="section fw-info-section"><div class="container grid grid-3"><article class="info-block"><h2>第一版情境</h2><p>報到通知、面試安排、體檢提醒、收取護照或居留證、文件補交通知、接送或接機通知。</p></article><article class="info-block"><h2>翻譯狀態</h2><p>中文範本標記為 reviewed；印尼文、越南文與泰文目前皆為 needs-native-review。</p></article><article class="info-block"><h2>資料原則</h2><p>不登入、不串 API、不保存表單、不建立歷史紀錄，也不傳送訊息全文。</p></article></div></section>
-</main>
-<footer class="site-footer"><div class="container footer-grid"><div><strong>由牧茗管理顧問有限公司規劃與開發</strong><p>Mu Ming Management Consulting Co., Ltd.</p><p><a href="https://sally741117.github.io/muming-website/">回到牧茗官網</a></p></div><nav class="footer-links"><a href="../../about.html">關於平台</a><a href="../../privacy.html">隱私權政策</a><a href="../../terms.html">使用條款</a><a href="mailto:muming9000@gmail.com?subject=MUMING%20WorkKit%20使用回饋">意見回饋</a><a href="mailto:muming9000@gmail.com">聯絡我們</a></nav></div></footer>
+  </main>
+</div>
 <script src="../../assets/js/analytics.js"></script>
 <script src="../../assets/js/main.js"></script>
-<script src="localization.js?v=20260801"></script>
-<script src="templates.js?v=20260801d"></script>
-<script src="tool.js?v=20260801d"></script>
+<script src="localization.js?v=20260802-date-time-place"></script>
+<script src="templates.js?v=20260802-date-time-place"></script>
+<script src="tool.js?v=20260802-date-time-place"></script>
 </body>
 </html>
-
-
-
-
-
-
-

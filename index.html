@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MUMING WorkKit｜牧茗產業工具平台</title>
-  <meta name="description" content="MUMING WorkKit 將行政訊息、文件、日期、費用、多語溝通與工作流程整理成企業可立即使用的數位工具。">
+  <title>MUMING WorkKit｜今天想完成什麼工作？</title>
+  <meta name="description" content="MUMING WorkKit 從工作需求出發，協助使用者找到適合的工具、流程或文件，把重複工作變成可直接使用的解法。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/">
-  <meta property="og:title" content="MUMING WorkKit｜牧茗產業工具平台">
-  <meta property="og:description" content="快速找到行政、工程、多語與流程工作工具。">
+  <meta property="og:title" content="MUMING WorkKit｜今天想完成什麼工作？">
+  <meta property="og:description" content="說出現在要處理的工作，從請款、通知、追蹤、翻譯、文件到巡檢，找到適合的工具與流程。">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sally741117.github.io/muming-workkit/">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/home.css?v=20260802-task-home">
   <meta name="theme-color" content="#0e3b32">
   <link rel="icon" href="data:,">
 </head>
-<body>
+<body class="home-task-page">
 <a class="skip-link" href="#main">跳到主要內容</a>
 <header class="site-header">
   <div class="container nav">
@@ -29,74 +30,194 @@
     </nav>
   </div>
 </header>
+
 <main id="main">
-  <section class="wk-compact-hero">
-    <div class="container">
-      <p class="eyebrow">MUMING WorkKit</p>
-      <h1>把重複工作，變成可直接使用的工具。</h1>
-      <form class="search-box wk-home-search" data-home-search-form>
-        <label class="search-label" for="home-search"><strong>今天想完成什麼工作？</strong><span>搜尋公告、報到、日期、費用、翻譯、流程、文件</span></label>
-        <div class="search-form">
-          <input id="home-search" data-home-search type="search" placeholder="輸入關鍵字，例如：報價、催件、多語通知" aria-label="搜尋工具">
-          <button class="button button-secondary" type="submit">搜尋工具</button>
+  <section class="home-hero" aria-labelledby="home-title">
+    <div class="container home-hero__grid">
+      <div class="home-hero__copy">
+        <p class="eyebrow">MUMING WorkKit 產業工作工具平台</p>
+        <h1 id="home-title">今天想完成什麼工作？</h1>
+        <p class="home-hero__lead">說出你現在要處理的工作，平台會協助你找到適合的工具、流程或文件。</p>
+        <p class="home-hero__value">把重複工作，變成可直接使用的工具。</p>
+
+        <form class="home-search" data-work-search-form>
+          <label class="home-search__label" for="home-work-search">工作需求搜尋</label>
+          <div class="home-search__row">
+            <input id="home-work-search" data-work-search type="search" placeholder="例如：我要請款、通知移工、追文件、安排面試……" autocomplete="off">
+            <button class="button button-secondary" type="submit">找工作解法</button>
+          </div>
+          <p class="home-search__hint">目前會將輸入內容帶到探索工具頁查詢；不會產生假搜尋結果。</p>
+        </form>
+
+        <div class="home-quick-row" aria-label="常見工作捷徑">
+          <a href="tools.html?q=請款">我要請款</a>
+          <a href="tools.html?q=通知">我要通知</a>
+          <a href="tools.html?q=追蹤">我要追蹤</a>
+          <a href="tools.html?q=翻譯">我要翻譯</a>
         </div>
-      </form>
-      <div class="wk-task-links" aria-label="工作入口">
-        <a href="tools.html?q=訊息">寫一段訊息</a>
-        <a href="tools.html?q=費用 日期">算費用或日期</a>
-        <a href="tools.html?q=文件">做一份文件</a>
-        <a href="tools.html?q=清單 流程">建立檢查清單</a>
-        <a href="tools.html?q=多語">處理多語通知</a>
-        <a href="tools.html?q=接案 現場">準備接案或現場工作</a>
+      </div>
+
+      <aside class="home-hero__sample" aria-label="使用方式示意">
+        <span class="home-sample__tag">使用情境示意</span>
+        <h2>先說工作，再找解法</h2>
+        <ol>
+          <li><strong>輸入需求</strong><span>例如：我要通知移工繳費。</span></li>
+          <li><strong>看見方向</strong><span>工具、流程、文件一起整理。</span></li>
+          <li><strong>進入工具</strong><span>再到探索工具頁查看可用項目。</span></li>
+        </ol>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section home-work-shortcuts" id="common-work" aria-labelledby="shortcut-title">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Common work</p>
+          <h2 id="shortcut-title">常見工作快捷入口</h2>
+          <p>不用先知道工具名稱，先選你今天想完成的工作。</p>
+        </div>
+      </div>
+      <div class="home-card-grid home-card-grid--work">
+        <a class="home-work-card" href="tools.html?q=請款"><span>款</span><strong>我要請款</strong><p>整理費用、明細與請款說明。</p><em>找解法 →</em></a>
+        <a class="home-work-card" href="tools.html?q=通知"><span>通</span><strong>我要通知</strong><p>把要交代的事寫成清楚訊息。</p><em>找解法 →</em></a>
+        <a class="home-work-card" href="tools.html?q=追蹤"><span>追</span><strong>我要追蹤</strong><p>掌握文件、繳費或待辦進度。</p><em>找解法 →</em></a>
+        <a class="home-work-card" href="tools.html?q=翻譯"><span>譯</span><strong>我要翻譯</strong><p>處理多語通知與工作說明。</p><em>找解法 →</em></a>
+        <a class="home-work-card" href="tools.html?q=排班"><span>班</span><strong>我要排班</strong><p>整理人員、時段與交接資訊。</p><em>找解法 →</em></a>
+        <a class="home-work-card" href="tools.html?q=面試"><span>面</span><strong>我要面試</strong><p>準備問題、資料與後續追蹤。</p><em>找解法 →</em></a>
+        <a class="home-work-card" href="tools.html?q=文件"><span>文</span><strong>我要製作文件</strong><p>產生表單、公告或說明初稿。</p><em>找解法 →</em></a>
+        <a class="home-work-card" href="tools.html?q=巡檢"><span>檢</span><strong>我要巡檢</strong><p>建立檢查項目與異常紀錄。</p><em>找解法 →</em></a>
       </div>
     </div>
   </section>
 
-  <section class="section wk-home-tools">
+  <section class="section home-solution-demo" aria-labelledby="solution-title">
     <div class="container">
       <div class="section-head">
-        <div><p class="eyebrow">Available tools</p><h2>目前可用／熱門工具</h2></div>
+        <div>
+          <p class="eyebrow">Solution example</p>
+          <h2 id="solution-title">從工作需求，找到適合的解法</h2>
+          <p>這是解法範例，用來說明平台的使用方式，不是假搜尋結果。</p>
+        </div>
+      </div>
+      <div class="home-solution">
+        <div class="home-solution__input">
+          <span>使用者需求</span>
+          <blockquote>我要通知移工繳費</blockquote>
+          <p>這類工作通常同時包含通知、費用說明與後續追蹤。</p>
+        </div>
+        <div class="home-solution__cards">
+          <article><span>工具</span><h3>多語繳費通知</h3><p>把期限、金額與注意事項整理成可傳送訊息。</p></article>
+          <article><span>流程</span><h3>費用明細產生器</h3><p>協助檢查費用項目與說明是否完整。</p></article>
+          <article><span>文件</span><h3>繳費追蹤提醒</h3><p>把尚未完成事項整理成可追蹤清單。</p></article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section home-work-categories" aria-labelledby="category-title">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Work categories</p>
+          <h2 id="category-title">依工作分類</h2>
+          <p>工作分類比產業分類更前面，讓使用者先從眼前任務開始。</p>
+        </div>
+      </div>
+      <div class="home-category-grid">
+        <a href="tools.html?q=文件"><span>文</span><strong>文件</strong><p>表單、公告、申請書與工作說明。</p></a>
+        <a href="tools.html?q=通知"><span>通</span><strong>通知</strong><p>對內外溝通、提醒與公告文字。</p></a>
+        <a href="tools.html?q=請款"><span>款</span><strong>請款</strong><p>費用明細、金額說明與請款流程。</p></a>
+        <a href="tools.html?q=追蹤"><span>追</span><strong>追蹤</strong><p>文件、待辦、期限與處理狀態。</p></a>
+        <a href="tools.html?q=排班"><span>班</span><strong>排班</strong><p>班表、人員、時段與交接事項。</p></a>
+        <a href="tools.html?q=面試"><span>面</span><strong>面試</strong><p>面試準備、問題與候選人追蹤。</p></a>
+        <a href="tools.html?q=翻譯"><span>譯</span><strong>翻譯</strong><p>多語訊息、外籍人力與現場溝通。</p></a>
+        <a href="tools.html?q=巡檢"><span>檢</span><strong>巡檢</strong><p>點檢、異常紀錄與改善追蹤。</p></a>
+        <a href="tools.html?q=提醒"><span>醒</span><strong>提醒</strong><p>期限、回覆、繳費與後續事項。</p></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section home-featured-tools" aria-labelledby="featured-title">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Available tools</p>
+          <h2 id="featured-title">目前可用工具</h2>
+          <p>工具資料從 tools-data.js 讀取，優先顯示正式可用與測試版項目。</p>
+        </div>
         <a class="button button-outline" href="tools.html">探索全部工具</a>
       </div>
-      <div class="wk-tool-strip" data-tool-list data-list-mode="home-solutions"></div>
+      <div class="home-tool-grid" data-home-featured-tools></div>
     </div>
   </section>
 
-  <section class="section wk-industry-entry">
+  <section class="section home-industries" aria-labelledby="industry-title">
     <div class="container">
       <div class="section-head">
-        <div><p class="eyebrow">Industry entry</p><h2>依產業快速進入</h2></div>
+        <div>
+          <p class="eyebrow">Industry packs</p>
+          <h2 id="industry-title">依產業瀏覽工具包</h2>
+          <p>當工作場景已經明確，也可以從產業入口查看工具包。</p>
+        </div>
         <a class="button button-outline" href="industries.html">查看產業工具包</a>
       </div>
-      <div class="wk-industry-links">
-        <a href="tools.html?industry=行政人資">行政人資</a>
-        <a href="tools.html?industry=工程職人">工程職人</a>
-        <a href="tools.html?industry=外籍人力">外籍人力</a>
-        <a href="tools.html?industry=工廠管理">工廠管理</a>
-        <a href="tools.html?industry=顧問業務">顧問業務</a>
+      <div class="home-industry-grid">
+        <a href="tools.html?industry=外籍人力"><strong>外籍移工仲介</strong><p>多語通知、費用說明、文件與期限提醒。</p><span>首波發展</span></a>
+        <a href="tools.html?industry=行政人資"><strong>人資管理</strong><p>報到、面試、通知、排班與員工資料。</p><span>持續建置中</span></a>
+        <a href="tools.html?industry=工廠管理"><strong>工廠管理</strong><p>巡檢、現場提醒、回報與教育訓練。</p><span>持續建置中</span></a>
+        <a href="tools.html?q=行政工作"><strong>中小企業行政</strong><p>請款、文件、提醒與日常行政流程。</p><span>持續建置中</span></a>
+        <a href="tools.html?q=餐飲管理"><strong>餐飲管理</strong><p>公告、班表、費用與交接事項。</p><span>持續建置中</span></a>
+        <a href="tools.html?q=長照照護"><strong>長照與照護</strong><p>照護紀錄、家屬通知與交接提醒。</p><span>持續建置中</span></a>
       </div>
     </div>
   </section>
 
-  <section class="section wk-short-about">
+  <section class="section home-latest-tools" aria-labelledby="latest-title">
     <div class="container">
-      <article>
-        <p class="eyebrow">About WorkKit</p>
-        <h2>簡單、快速、免登入的產業工作工具平台。</h2>
-        <p>MUMING WorkKit 目前公開測試中，先提供可立即使用的基礎工具，協助中小企業與產業工作者整理訊息、費用、日期、流程與文件。更完整的產品方向可至關於平台查看。</p>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Latest updates</p>
+          <h2 id="latest-title">最新工具</h2>
+          <p>依 tools-data.js 的 updated_at 真實排序。</p>
+        </div>
+      </div>
+      <div class="home-latest-list" data-home-latest-tools></div>
+    </div>
+  </section>
+
+  <section class="section home-short-about" aria-labelledby="about-title">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">About WorkKit</p>
+          <h2 id="about-title">讓工作入口更清楚、更容易開始。</h2>
+          <p>MUMING WorkKit 把常見工作整理成可直接使用的工具、流程與文件入口，適合從日常任務開始逐步導入。</p>
+        </div>
         <a class="button button-secondary" href="about.html">關於平台</a>
-      </article>
+      </div>
+      <div class="home-feature-grid">
+        <article><span>始</span><h3>從工作需求開始</h3><p>先描述要完成的工作，再找適合工具。</p></article>
+        <article><span>少</span><h3>少輸入、少點擊</h3><p>把高頻入口放在首頁第一層。</p></article>
+        <article><span>用</span><h3>工具可直接使用</h3><p>正式可用與測試版狀態清楚標示。</p></article>
+        <article><span>機</span><h3>手機與電腦皆可操作</h3><p>日常工作可以在不同裝置上開始。</p></article>
+      </div>
     </div>
   </section>
 </main>
+
 <footer class="site-footer">
   <div class="container footer-grid">
     <div><strong>由牧茗管理顧問有限公司規劃與開發</strong><p>Mu Ming Management Consulting Co., Ltd.</p><p><a href="https://sally741117.github.io/muming-website/">回到牧茗官網</a></p></div>
     <nav class="footer-links"><a href="about.html">關於平台</a><a href="privacy.html">隱私權政策</a><a href="terms.html">使用條款</a><a href="mailto:muming9000@gmail.com?subject=MUMING%20WorkKit%20使用回饋">意見回饋</a><a href="mailto:muming9000@gmail.com">聯絡我們</a></nav>
   </div>
 </footer>
+
+<div class="home-toast" data-home-toast role="status" aria-live="polite"></div>
+
 <script src="assets/js/tools-data.js"></script>
 <script src="assets/js/analytics.js"></script>
 <script src="assets/js/main.js"></script>
+<script src="assets/js/home.js?v=20260802-task-home"></script>
 </body>
 </html>

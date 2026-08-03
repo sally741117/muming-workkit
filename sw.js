@@ -1,4 +1,4 @@
-const CACHE_NAME = "muming-workkit-v11";
+const CACHE_NAME = "muming-workkit-v14";
 const CACHE_PREFIX = "muming-workkit-";
 
 const HTML_ASSETS = [
@@ -17,7 +17,9 @@ const HTML_ASSETS = [
 
 const STATIC_ASSETS = [
   "./assets/css/styles.css",
+  "./assets/css/home.css",
   "./assets/js/main.js",
+  "./assets/js/home.js",
   "./assets/js/tools-data.js",
   "./assets/js/analytics.js",
   "./tools/foreign-workforce-message/tool.css",

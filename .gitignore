@@ -13,6 +13,9 @@ node_modules/
 *.temp
 *.bak
 *.backup
+*.backup-*.html
+*.backup-*.css
+*.backup-*.js
 *.swp
 *.swo
 *.lock
