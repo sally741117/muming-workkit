@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>接案報價小幫手｜MUMING WorkKit</title>
-  <meta name="description" content="整理材料、人力與必要支出，快速檢查報價是否完整。">
+  <meta name="description" content="整理材料、人力與必要支出，快速檢查報價是否完整，並產生內部成本評估與客戶報價單。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/project-quote-helper/">
   <meta property="og:title" content="接案報價小幫手｜MUMING WorkKit">
   <meta property="og:description" content="整理材料、人力與必要支出，快速檢查報價是否完整。">
   <meta property="og:type" content="website">
   <link rel="manifest" href="../../manifest.webmanifest">
   <link rel="stylesheet" href="../../assets/css/styles.css">
-  <link rel="stylesheet" href="tool.css?v=20260801-workorder-complete">
+  <link rel="stylesheet" href="tool.css?v=20260805-confirmation-layout">
   <meta name="theme-color" content="#173f35">
   <link rel="icon" href="data:,">
 </head>
@@ -30,19 +30,38 @@
   </div>
 </header>
 <main id="main" data-project-quote-tool>
+  <datalist id="pq-material-unit-options">
+    <option value="個"></option>
+    <option value="組"></option>
+    <option value="式"></option>
+    <option value="台"></option>
+    <option value="支"></option>
+    <option value="片"></option>
+    <option value="包"></option>
+    <option value="箱"></option>
+    <option value="桶"></option>
+    <option value="捲"></option>
+    <option value="米"></option>
+    <option value="平方米"></option>
+    <option value="坪"></option>
+    <option value="立方米"></option>
+    <option value="車"></option>
+    <option value="天"></option>
+    <option value="次"></option>
+  </datalist>
   <section class="pq-work-order">
     <div class="container pq-sheet">
       <div class="pq-sheet-head">
         <div>
           <p class="pq-pack-label">職人工程工具包</p>
           <h1>接案報價小幫手</h1>
-          <p class="pq-purpose">公開測試版｜施工估價草稿｜報價前支出檢查｜不等同正式報價單｜不提供市場行情、正式會計、稅務或標準報價建議</p>
+          <p class="pq-purpose">公開測試版｜施工估價草稿｜內部成本評估｜客戶報價單列印｜不等同正式會計、稅務或市場行情建議</p>
         </div>
         <span class="pq-stamp" data-risk-level>資料待補</span>
       </div>
 
       <div class="pq-mobile-progress" aria-live="polite">
-        <span data-step-label>完整盤點表｜可展開收合</span>
+        <span data-step-label>完整盤點表｜明細可展開收合</span>
         <div class="pq-step-track" aria-hidden="true"><i data-step-progress></i></div>
       </div>
 
@@ -53,33 +72,59 @@
             <div class="pq-grid pq-ledger-grid">
               <div class="field"><label for="project_type">工程類型</label><select class="control" id="project_type" name="project_type" data-project-type></select></div>
               <div class="field pq-custom-type" data-custom-project-type hidden><label for="custom_project_type">自訂工程類型</label><input class="control" id="custom_project_type" name="custom_project_type" autocomplete="off" placeholder="例如：小型浴室防水修繕"></div>
-              <div class="field"><label for="quote_amount">預計報價金額</label><input class="control" id="quote_amount" name="quote_amount" inputmode="decimal" placeholder="例如：30000" data-money></div>
-              <div class="field"><label for="crew_count">施工人數</label><input class="control" id="crew_count" name="crew_count" inputmode="decimal" placeholder="例如：2" data-number></div>
-              <div class="field"><label for="work_days">預估工作天數</label><input class="control" id="work_days" name="work_days" inputmode="decimal" placeholder="例如：3" data-number></div>
-              <div class="field"><label for="daily_labor_cost">每人每日人力成本</label><input class="control" id="daily_labor_cost" name="daily_labor_cost" inputmode="decimal" placeholder="例如：2500" data-money></div>
+              <div class="field"><label for="quote_amount">預計報價金額</label><input class="control" id="quote_amount" name="quote_amount" inputmode="decimal" placeholder="例如：80000" data-money></div>
+              <div class="field pq-crew-summary"><span class="pq-field-label">施工人數</span><strong data-crew-summary>0 人</strong><small data-crew-note>請新增人力項目</small><button class="pq-inline-button" type="button" data-edit-labor>編輯人力明細</button></div>
+              <div class="field"><label for="work_days">預估工作天數</label><input class="control" id="work_days" name="work_days" inputmode="decimal" placeholder="新增人力項目時帶入" data-number></div>
+              <div class="field"><label for="customer_name">客戶名稱</label><input class="control" id="customer_name" name="customer_name" autocomplete="off" placeholder="選填"></div>
+              <div class="field"><label for="project_name">工程名稱</label><input class="control" id="project_name" name="project_name" autocomplete="off" placeholder="選填"></div>
+              <div class="field"><label for="project_address">工程地址</label><input class="control" id="project_address" name="project_address" autocomplete="off" placeholder="選填"></div>
+              <div class="field"><label for="quote_date">報價日期</label><input class="control" id="quote_date" name="quote_date" type="date"></div>
+              <div class="field"><label for="valid_until">有效期限</label><input class="control" id="valid_until" name="valid_until" autocomplete="off" placeholder="例如：報價後 14 日內"></div>
+              <div class="field"><label for="company_title">公司名稱／抬頭</label><input class="control" id="company_title" name="company_title" autocomplete="off" placeholder="選填，不填假資料"></div>
+              <div class="field"><label for="quote_title">報價單名稱</label><input class="control" id="quote_title" name="quote_title" autocomplete="off" value="工程報價單"></div>
             </div>
           </section>
 
           <section class="pq-section pq-step-panel" data-step="2">
             <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>02</span>主要支出</button></h2>
-            <div class="pq-grid pq-ledger-grid">
-              <div class="field"><label for="material_cost">材料費</label><input class="control" id="material_cost" name="material_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
-              <div class="field"><label for="subcontract_cost">外包費</label><input class="control" id="subcontract_cost" name="subcontract_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
-              <div class="field"><label for="parking_cost">停車費</label><input class="control" id="parking_cost" name="parking_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
+            <div class="pq-summary-ledger pq-summary-ledger--four">
+              <div><span>人力成本合計</span><strong data-total="labor">0 元</strong><button type="button" data-detail-toggle="labor" aria-expanded="false">設定人力明細</button></div>
+              <div><span>材料成本合計</span><strong data-total="material">0 元</strong><button type="button" data-detail-toggle="material" aria-expanded="false">設定材料明細</button></div>
+              <div><span>外包成本合計</span><strong data-total="subcontract">0 元</strong><button type="button" data-detail-toggle="subcontract" aria-expanded="false">設定外包明細</button></div>
+              <div><span>其他成本合計</span><strong data-total="other">0 元</strong><button type="button" data-detail-toggle="other" aria-expanded="false">設定其他支出</button></div>
+            </div>
+            <div class="pq-detail-panel" data-detail-panel="labor" hidden>
+              <div class="pq-detail-head"><h3>人力明細</h3><button class="pq-inline-button" type="button" data-add-row="labor">＋新增工種</button></div>
+              <div data-detail-list="labor"></div>
+            </div>
+            <div class="pq-detail-panel" data-detail-panel="material" hidden>
+              <div class="pq-detail-head"><h3>材料明細</h3><button class="pq-inline-button" type="button" data-add-row="material">＋新增材料項目</button></div>
+              <div data-detail-list="material"></div>
+            </div>
+            <div class="pq-detail-panel" data-detail-panel="subcontract" hidden>
+              <div class="pq-detail-head"><h3>外包明細</h3><button class="pq-inline-button" type="button" data-add-row="subcontract">＋新增外包項目</button></div>
+              <div data-detail-list="subcontract"></div>
+            </div>
+            <div class="pq-detail-panel" data-detail-panel="other" hidden>
+              <div class="pq-detail-head"><h3>其他支出</h3><button class="pq-inline-button" type="button" data-add-row="other">＋新增自訂項目</button></div>
+              <div data-detail-list="other"></div>
             </div>
           </section>
 
-          <section class="pq-section pq-step-panel" data-step="3">
-            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>03</span>其他可能支出</button></h2>
-            <div class="pq-grid pq-ledger-grid">
-              <div class="field"><label for="consumable_cost">耗材費</label><input class="control" id="consumable_cost" name="consumable_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
-              <div class="field"><label for="meal_cost">餐費</label><input class="control" id="meal_cost" name="meal_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
-              <div class="field"><label for="other_cost">其他必要支出</label><input class="control" id="other_cost" name="other_cost" inputmode="decimal" placeholder="空白視為 0" data-money></div>
-            </div>
+          <section class="pq-section pq-step-panel is-collapsed" data-step="3">
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="false"><span>03</span>工程特徵</button></h2>
             <div class="pq-feature-box">
-              <h3>工程特徵</h3>
-              <p class="pq-feature-note">勾選後可填寫對應費用；若已包含在人力費或外包費中，可填 0。</p>
+              <p class="pq-feature-note">勾選後會建立待填寫的支出草稿，不會自動填入金額。</p>
+              <div class="pq-feature-summary" data-feature-summary>尚未建立待確認支出。</div>
+              <button class="pq-inline-button" type="button" data-go-pending-costs hidden>前往填寫</button>
               <div class="pq-checks" data-feature-list></div>
+            </div>
+          </section>
+
+          <section class="pq-section pq-step-panel is-collapsed" data-step="5">
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="false"><span>04</span>內部備註</button></h2>
+            <div class="pq-grid pq-ledger-grid">
+              <div class="field"><label for="internal_note">內部備註</label><input class="control" id="internal_note" name="internal_note" autocomplete="off" placeholder="僅內部評估顯示，不進客戶版"></div>
             </div>
           </section>
 
@@ -87,38 +132,62 @@
             <button class="button button-primary" type="button" data-calculate>開始試算</button>
             <button class="button button-outline" type="button" data-reset>清除全部</button>
           </div>
-          <p class="notice pq-privacy-note">本工具只在瀏覽器內計算，不保存表單內容，不傳送金額、工程資料或摘要全文。</p>
+          <p class="notice pq-privacy-note">本工具只在目前瀏覽器頁面內計算，不登入、不串 API、不保存表單內容，不傳送金額、工程資料或摘要全文。</p>
         </form>
 
-        <aside class="pq-results pq-step-panel" data-step="4" aria-label="報價檢查結果">
+        <aside class="pq-results pq-step-panel" data-step="6" aria-label="報價檢查結果">
           <section class="pq-section pq-result-section">
-            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>04</span>報價檢查結果</button></h2>
-            <div class="pq-result-main" data-main-result></div>
-            <div class="pq-secondary-numbers" data-secondary-numbers></div>
-            <div class="pq-ruler-wrap">
-              <div class="pq-ruler-labels"><span>不足</span><span>接近已估支出</span><span>尚有應變空間</span></div>
-              <div class="pq-ruler" data-ruler><i></i></div>
-              <p>依目前輸入資料顯示，僅供報價前檢查，不代表標準報價。</p>
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>06</span>報價檢查結果</button></h2>
+            <div class="pq-output-tabs" role="tablist" aria-label="輸出模式">
+              <button class="is-active" type="button" data-output-mode="internal" role="tab" aria-selected="true">內部成本評估</button>
+              <button type="button" data-output-mode="customer" role="tab" aria-selected="false">客戶報價單</button>
             </div>
-            <div class="pq-work-note" data-work-note></div>
+            <div class="pq-output-panel" data-output-panel="internal">
+              <div class="pq-result-main" data-main-result></div>
+              <div class="pq-secondary-numbers" data-secondary-numbers></div>
+              <div class="pq-ruler-wrap">
+                <div class="pq-ruler-labels"><span>不足</span><span>接近已估支出</span><span>尚有應變空間</span></div>
+                <div class="pq-ruler" data-ruler><i></i></div>
+                <p>依目前輸入資料顯示，僅供報價前檢查，不代表標準報價。</p>
+              </div>
+              <div class="pq-work-note" data-work-note></div>
+            </div>
+            <div class="pq-output-panel" data-output-panel="customer" hidden>
+              <section class="pq-customer-settings" data-customer-settings>
+                <h3>客戶報價項目設定</h3>
+                <p class="pq-feature-note">勾選要顯示在客戶報價單的項目；顯示名稱與報價金額可自行調整，不影響內部成本。</p>
+                <div data-customer-list></div>
+              </section>
+              <section class="pq-customer-settings pq-customer-tax">
+                <h3>稅額設定與客戶備註</h3>
+                <div class="pq-grid pq-ledger-grid">
+                  <div class="field"><label for="tax_mode">稅額計算方式</label><select class="control" id="tax_mode" name="tax_mode"><option value="exclusive">未稅金額另加稅</option><option value="inclusive">輸入金額已含稅</option></select></div>
+                  <div class="field"><label for="tax_rate">營業稅率 %</label><input class="control" id="tax_rate" name="tax_rate" inputmode="decimal" value="5" data-number></div>
+                  <div class="field"><label for="customer_note">客戶備註</label><input class="control" id="customer_note" name="customer_note" autocomplete="off" placeholder="例如：實際數量依現場丈量調整"></div>
+                </div>
+              </section>
+              <div class="pq-customer-preview" data-customer-preview></div>
+              <div class="pq-customer-print-actions"><button class="button button-outline" type="button" data-print-customer>列印客戶報價單</button></div>
+            </div>
           </section>
 
-          <section class="pq-section pq-cost-section">
-            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>05</span>支出明細</button></h2>
+          <section class="pq-section pq-cost-section" data-internal-only>
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>07</span>支出明細</button></h2>
             <div class="pq-breakdown" data-breakdown></div>
           </section>
 
-          <section class="pq-section pq-check-section">
-            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>06</span>待確認清單</button></h2>
+          <section class="pq-section pq-check-section" data-internal-only>
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>08</span>待確認清單</button></h2>
             <div class="pq-alerts" data-alerts></div>
           </section>
 
           <section class="pq-section pq-copy-section">
-            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>07</span>複製與列印</button></h2>
+            <h2><button class="pq-section-toggle" type="button" data-section-toggle aria-expanded="true"><span>09</span>複製與列印</button></h2>
             <pre class="pq-copy-text" data-copy-text></pre>
             <div class="pq-copy-actions">
-              <button class="button button-secondary" type="button" data-copy-summary>複製試算摘要</button>
-              <button class="button button-outline" type="button" data-print>列印結果</button>
+              <button class="button button-secondary" type="button" data-copy-summary>複製目前摘要</button>
+              <button class="button button-outline" type="button" data-print-internal>列印內部成本評估</button>
+              <button class="button button-outline" type="button" data-print-customer data-customer-only>列印客戶報價單</button>
               <button class="button button-outline" type="button" data-share-tool>分享工具網址</button>
             </div>
           </section>
@@ -145,7 +214,6 @@
 <script src="../../assets/js/analytics.js"></script>
 <script src="../../assets/js/main.js"></script>
 <script src="rules.js?v=20260801"></script>
-<script src="tool.js?v=20260801-workorder-complete"></script>
+<script src="tool.js?v=20260805-release"></script>
 </body>
 </html>
-
