@@ -1,4 +1,4 @@
-const CACHE_NAME = "muming-workkit-v14";
+const CACHE_NAME = "muming-workkit-v15";
 const CACHE_PREFIX = "muming-workkit-";
 
 const HTML_ASSETS = [
@@ -12,7 +12,8 @@ const HTML_ASSETS = [
   "./404.html",
   "./tools/admin-message/index.html",
   "./tools/foreign-workforce-message/index.html",
-  "./tools/project-quote-helper/index.html"
+  "./tools/project-quote-helper/index.html",
+  "./tools/document-layout-helper/index.html"
 ];
 
 const STATIC_ASSETS = [
@@ -29,6 +30,12 @@ const STATIC_ASSETS = [
   "./tools/project-quote-helper/tool.css",
   "./tools/project-quote-helper/rules.js",
   "./tools/project-quote-helper/tool.js",
+  "./tools/document-layout-helper/tool.css",
+  "./tools/document-layout-helper/app.js",
+  "./tools/document-layout-helper/vendor/pdf.min.js",
+  "./tools/document-layout-helper/vendor/pdf.worker.min.js",
+  "./tools/document-layout-helper/vendor/opencv.js",
+  "./tools/document-layout-helper/vendor/jspdf.umd.min.js",
   "./manifest.webmanifest"
 ];
 
@@ -66,6 +73,7 @@ function fallbackHtmlPath(request) {
   if (url.pathname.endsWith("/tools/project-quote-helper/")) return "./tools/project-quote-helper/index.html";
   if (url.pathname.endsWith("/tools/admin-message/")) return "./tools/admin-message/index.html";
   if (url.pathname.endsWith("/tools/foreign-workforce-message/")) return "./tools/foreign-workforce-message/index.html";
+  if (url.pathname.endsWith("/tools/document-layout-helper/")) return "./tools/document-layout-helper/index.html";
   return "./404.html";
 }
 

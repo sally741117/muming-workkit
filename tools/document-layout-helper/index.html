@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>證件排版小幫手 | MUMING WorkKit</title>
+  <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
+  <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
+  <link rel="stylesheet" href="./tool.css">
+  <script src="./vendor/pdf.min.js"></script>
+  <script async src="./vendor/opencv.js"></script>
+  <script src="./vendor/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="brand">MUMING WorkKit</p>
+      <h1>證件排版小幫手</h1>
+    </div>
+    <p class="privacy">證件僅於本機瀏覽器處理，不會上傳或儲存。</p>
+  </header>
+
+  <main>
+    <section class="steps" aria-label="流程">
+      <span class="active">1 上傳</span>
+      <span>2 自動裁切</span>
+      <span>3 確認</span>
+      <span>4 分組</span>
+      <span>5 A4 預覽</span>
+      <span>6 PDF</span>
+    </section>
+
+    <section class="workspace">
+      <section class="panel cases-panel">
+        <div class="panel-head">
+          <div>
+            <h2>案件工作區</h2>
+            <p id="engineStatus" class="engine">影像引擎載入中...</p>
+          </div>
+          <button id="addCaseBtn" class="ghost" type="button">＋新增下一組案件</button>
+        </div>
+        <div id="statusLog" class="status-log" aria-live="polite"></div>
+        <div id="cases"></div>
+      </section>
+    </section>
+
+    <section class="panel preview-panel">
+      <div class="panel-head">
+        <h2>A4 預覽</h2>
+        <div class="actions">
+          <button id="previewBtn" class="secondary" type="button">產生 A4 預覽</button>
+          <button id="pdfBtn" class="primary" type="button">產生 PDF</button>
+        </div>
+      </div>
+      <div id="a4Preview" class="a4-preview empty">
+        <p>分組完成後產生預覽</p>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="cropDialog" class="crop-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <div class="crop-dialog-title">
+          <h2>調整裁切</h2>
+          <span id="cropAssignmentContext" hidden></span>
+        </div>
+        <button class="icon" value="cancel" aria-label="關閉" type="button" data-crop-cancel tabindex="-1">×</button>
+      </div>
+      <div class="crop-tools">
+        <button id="autoCropBtn" class="primary" type="button">✨ 一鍵自動裁切</button>
+        <button id="redetectFrameBtn" type="button">重新找外框</button>
+        <button id="nextFrameBtn" type="button" hidden>下一個外框</button>
+        <button id="rotateLeftBtn" type="button">向左 90°</button>
+        <button id="rotateRightBtn" type="button">向右 90°</button>
+        <button id="rotate180Btn" type="button">旋轉 180°</button>
+        <button id="resetCropBtn" type="button">還原原始裁切</button>
+      </div>
+      <div class="crop-grid">
+        <div class="crop-source">
+          <div class="crop-stage">
+            <canvas id="cropCanvas" tabindex="0" aria-label="裁切影像"></canvas>
+            <svg id="cropOverlay"></svg>
+          </div>
+          <p id="cropHandleHint" class="crop-handle-hint">使用方向鍵微調，Shift＋方向鍵快速移動</p>
+        </div>
+        <div class="crop-preview">
+          <h3>校正預覽</h3>
+          <canvas id="correctedCanvas" width="850" height="540"></canvas>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button value="cancel" type="button" data-crop-cancel>取消</button>
+        <button id="applyCropBtn" class="primary" value="default" type="button">套用</button>
+      </div>
+      <div id="discardCropPrompt" class="discard-crop-prompt" hidden>
+        <div class="discard-crop-box" role="alertdialog" aria-modal="true" aria-labelledby="discardCropTitle">
+          <h3 id="discardCropTitle">放棄尚未套用的修改？</h3>
+          <p>四角位置與旋轉變更尚未套用。</p>
+          <div class="dialog-actions">
+            <button id="keepEditingCropBtn" type="button">繼續編輯</button>
+            <button id="discardCropBtn" class="danger" type="button">放棄修改</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="cardChoiceDialog" class="card-choice-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <div>
+          <h2>選擇要放入的證件</h2>
+          <p id="cardChoiceContext" class="dialog-context"></p>
+        </div>
+        <button id="cancelCardChoiceBtn" class="icon" value="cancel" aria-label="關閉" type="button">×</button>
+      </div>
+      <div id="cardChoiceOptions" class="card-choice-options"></div>
+      <div class="dialog-actions">
+        <button type="button" data-choice-cancel>取消</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="replaceDialog" class="replace-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <h2>此位置已有證件</h2>
+      </div>
+      <p>要取代嗎？</p>
+      <div class="dialog-actions">
+        <button id="cancelReplaceBtn" value="cancel" type="button">取消</button>
+        <button id="confirmReplaceBtn" class="primary" value="default" type="button">取代</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="viewerDialog" class="viewer-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <h2>查看證件</h2>
+        <button class="icon" value="cancel" aria-label="關閉" type="submit">×</button>
+      </div>
+      <div class="viewer-switch">
+        <button id="viewOriginalBtn" type="button" class="active">原始</button>
+        <button id="viewEnhancedBtn" type="button">自然增強</button>
+      </div>
+      <img id="viewerImage" alt="證件大圖">
+    </form>
+  </dialog>
+
+  <script src="./app.js"></script>
+</body>
+</html>
