@@ -28,7 +28,8 @@ const state = {
   pointerDrag: null,
   cvReady: false,
   pdfReady: false,
-  pdfCache: null
+  activePreviewCaseId: null,
+  pdfCache: new Map()
 };
 
 const el = {
@@ -36,9 +37,7 @@ const el = {
   statusLog: document.querySelector("#statusLog"),
   cases: document.querySelector("#cases"),
   addCaseBtn: document.querySelector("#addCaseBtn"),
-  previewBtn: document.querySelector("#previewBtn"),
-  pdfBtn: document.querySelector("#pdfBtn"),
-  sharePdfBtn: document.querySelector("#sharePdfBtn"),
+  previewTitle: document.querySelector("#previewTitle"),
   a4Preview: document.querySelector("#a4Preview"),
   cropDialog: document.querySelector("#cropDialog"),
   cropAssignmentContext: document.querySelector("#cropAssignmentContext"),
@@ -87,15 +86,21 @@ function isMobilePdfEnvironment() {
 }
 
 function updatePdfActions() {
-  if (!el.pdfBtn) return;
-  el.pdfBtn.textContent = state.pdfCache
-    ? (isMobilePdfEnvironment() ? "開啟 PDF" : "下載 PDF")
-    : "產生 PDF";
+  el.cases.querySelectorAll('[data-action="pdf-case"]').forEach((button) => {
+    button.textContent = state.pdfCache.has(button.dataset.caseId)
+      ? (isMobilePdfEnvironment() ? "開啟 PDF" : "下載 PDF")
+      : "產生 PDF";
+  });
 }
 
-function invalidatePdfCache() {
-  if (state.pdfCache?.objectUrl) URL.revokeObjectURL(state.pdfCache.objectUrl);
-  state.pdfCache = null;
+function invalidatePdfCache(caseId = null) {
+  const entries = caseId
+    ? [[caseId, state.pdfCache.get(caseId)]]
+    : [...state.pdfCache.entries()];
+  entries.forEach(([key, bundle]) => {
+    if (bundle?.objectUrl) URL.revokeObjectURL(bundle.objectUrl);
+    state.pdfCache.delete(key);
+  });
   updatePdfActions();
 }
 
@@ -130,14 +135,16 @@ async function initEngines() {
 
 function addDefaultCase() {
   invalidatePdfCache();
-  state.cases.push({
+  const caseItem = {
     id: uid("case"),
     title: `案件 ${state.cases.length + 1}`,
     people: [
       { id: uid("person"), role: "雇主", front: null, back: null, fixed: true },
       { id: uid("person"), role: "被照顧人", front: null, back: null, fixed: true }
     ]
-  });
+  };
+  state.cases.push(caseItem);
+  if (!state.activePreviewCaseId) state.activePreviewCaseId = caseItem.id;
 }
 
 function renderAll() {
@@ -228,7 +235,12 @@ function renderCases() {
     box.innerHTML = `
       <div class="case-head">
         <h3>${item.title}</h3>
-        ${caseIndex > 0 ? '<button type="button" data-action="delete-case">刪除案件</button>' : ""}
+        <div class="case-head-actions">
+          <button type="button" class="secondary" data-action="preview-case" data-case-id="${item.id}">預覽此案件</button>
+          <button type="button" class="primary" data-action="pdf-case" data-case-id="${item.id}">產生 PDF</button>
+          <button type="button" data-action="share-pdf-case" data-case-id="${item.id}">分享 PDF</button>
+          ${caseIndex > 0 ? '<button type="button" data-action="delete-case">刪除案件</button>' : ""}
+        </div>
       </div>
       <div class="people"></div>
       <div class="case-actions"><button type="button" data-action="add-person">＋新增人員</button></div>`;
@@ -238,9 +250,13 @@ function renderCases() {
       const action = event.target.closest("button")?.dataset.action;
       if (action === "add-person") addPerson(item.id);
       if (action === "delete-case") deleteCase(item.id);
+      if (action === "preview-case") renderA4Preview(item.id);
+      if (action === "pdf-case") generatePdf(item.id);
+      if (action === "share-pdf-case") void sharePdf(item.id);
     });
     el.cases.appendChild(box);
   });
+  updatePdfActions();
 }
 
 function personNode(caseId, person) {
@@ -441,6 +457,10 @@ function deleteCase(caseId) {
   const removedIds = new Set(found?.people.flatMap((person) => [person.front, person.back]).filter(Boolean) || []);
   state.cards = state.cards.filter((card) => !removedIds.has(card.id));
   state.cases = state.cases.filter((item) => item.id !== caseId);
+  if (state.activePreviewCaseId === caseId) {
+    state.activePreviewCaseId = state.cases[0]?.id || null;
+    renderA4Preview(state.activePreviewCaseId);
+  }
   renderAll();
 }
 
@@ -559,9 +579,6 @@ function removeCard(cardId) {
 }
 
 el.addCaseBtn.addEventListener("click", () => { addDefaultCase(); renderAll(); });
-el.previewBtn.addEventListener("click", renderA4Preview);
-el.pdfBtn.addEventListener("click", generatePdf);
-el.sharePdfBtn.addEventListener("click", sharePdf);
 
 async function processFiles(files, options = {}) {
   if (!files.length) return [];
@@ -1847,27 +1864,47 @@ window.addEventListener("resize", () => {
   });
 });
 
-function rowsForPrint() {
-  return state.cases.flatMap((c) => c.people.map((p) => ({
-    label: `${c.title} ${p.role}`,
+function rowsForCase(caseId) {
+  const caseItem = state.cases.find((item) => item.id === caseId);
+  if (!caseItem) return [];
+  return caseItem.people.map((p) => ({
+    label: `${caseItem.title} ${p.role}`,
     front: state.cards.find((card) => card.id === p.front),
     back: state.cards.find((card) => card.id === p.back)
-  }))).filter((row) => row.front || row.back);
+  })).filter((row) => row.front || row.back);
 }
 
-function renderA4Preview() {
-  const rows = rowsForPrint();
-  el.a4Preview.innerHTML = "";
-  el.a4Preview.classList.toggle("empty", rows.length === 0);
-  if (!rows.length) {
-    el.a4Preview.innerHTML = "<p>尚未放入任何證件</p>";
+function buildCasePages(caseId) {
+  const rows = rowsForCase(caseId);
+  const rowsPerPage = 4;
+  const pages = [];
+  for (let i = 0; i < rows.length; i += rowsPerPage) {
+    pages.push(rows.slice(i, i + rowsPerPage));
+  }
+  return pages;
+}
+
+function renderA4Preview(caseId) {
+  const caseItem = state.cases.find((item) => item.id === caseId);
+  if (!caseItem) {
+    el.previewTitle.textContent = "A4 預覽";
+    el.a4Preview.classList.add("empty");
+    el.a4Preview.innerHTML = "<p>請先新增案件</p>";
     return;
   }
-  const rowsPerPage = 4;
-  for (let i = 0; i < rows.length; i += rowsPerPage) {
+  state.activePreviewCaseId = caseId;
+  const pages = buildCasePages(caseId);
+  el.previewTitle.textContent = `A4 預覽｜${caseItem.title}`;
+  el.a4Preview.innerHTML = "";
+  el.a4Preview.classList.toggle("empty", pages.length === 0);
+  if (!pages.length) {
+    el.a4Preview.innerHTML = `<p>${caseItem.title} 尚未放入任何證件</p>`;
+    return;
+  }
+  pages.forEach((rows) => {
     const page = document.createElement("div");
     page.className = "page";
-    rows.slice(i, i + rowsPerPage).forEach((row) => {
+    rows.forEach((row) => {
       const line = document.createElement("div");
       line.className = "print-row";
       line.appendChild(printCell(row.front));
@@ -1875,7 +1912,7 @@ function renderA4Preview() {
       page.appendChild(line);
     });
     el.a4Preview.appendChild(page);
-  }
+  });
 }
 
 function printCell(card) {
@@ -1885,20 +1922,19 @@ function printCell(card) {
   return cell;
 }
 
-function pdfFilename(date = new Date()) {
-  const stamp = [date.getFullYear(), date.getMonth() + 1, date.getDate()]
-    .map((value) => String(value).padStart(2, "0"))
-    .join("");
-  return `證件影本_${stamp}.pdf`;
+function pdfFilename(caseItem) {
+  const caseName = caseItem.title.replace(/\s+/g, "");
+  return `${caseName}_證件影本.pdf`;
 }
 
-function buildPdfBundle() {
-  const rows = rowsForPrint();
-  if (!rows.length) {
-    renderA4Preview();
+function buildPdfBundle(caseId) {
+  const caseItem = state.cases.find((item) => item.id === caseId);
+  const pages = buildCasePages(caseId);
+  if (!caseItem || !pages.length) {
+    renderA4Preview(caseId);
     return null;
   }
-  renderA4Preview();
+  renderA4Preview(caseId);
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const marginX = 12;
@@ -1906,27 +1942,30 @@ function buildPdfBundle() {
   const gapX = 8;
   const gapY = 8;
   const rowH = CARD_H_MM + gapY;
-  rows.forEach((row, index) => {
-    if (index > 0 && index % 4 === 0) pdf.addPage();
-    const y = marginY + (index % 4) * rowH;
-    if (row.front) pdf.addImage(row.front.currentDataUrl, "JPEG", marginX, y, CARD_W_MM, CARD_H_MM);
-    if (row.back) pdf.addImage(row.back.currentDataUrl, "JPEG", marginX + CARD_W_MM + gapX, y, CARD_W_MM, CARD_H_MM);
+  pages.forEach((rows, pageIndex) => {
+    if (pageIndex > 0) pdf.addPage();
+    rows.forEach((row, rowIndex) => {
+      const y = marginY + rowIndex * rowH;
+      if (row.front) pdf.addImage(row.front.currentDataUrl, "JPEG", marginX, y, CARD_W_MM, CARD_H_MM);
+      if (row.back) pdf.addImage(row.back.currentDataUrl, "JPEG", marginX + CARD_W_MM + gapX, y, CARD_W_MM, CARD_H_MM);
+    });
   });
   const outputBlob = pdf.output("blob");
   const blob = outputBlob.type === "application/pdf"
     ? outputBlob
     : new Blob([outputBlob], { type: "application/pdf" });
-  const filename = pdfFilename();
+  const filename = pdfFilename(caseItem);
   const file = typeof File === "function"
     ? new File([blob], filename, { type: "application/pdf" })
     : null;
-  state.pdfCache = { blob, file, filename, objectUrl: null };
+  const bundle = { caseId, blob, file, filename, objectUrl: null };
+  state.pdfCache.set(caseId, bundle);
   updatePdfActions();
-  return state.pdfCache;
+  return bundle;
 }
 
-function getPdfBundle() {
-  return state.pdfCache || buildPdfBundle();
+function getPdfBundle(caseId) {
+  return state.pdfCache.get(caseId) || buildPdfBundle(caseId);
 }
 
 function pdfObjectUrl(bundle) {
@@ -1959,8 +1998,8 @@ function downloadPdf(bundle) {
   link.remove();
 }
 
-function generatePdf() {
-  const bundle = getPdfBundle();
+function generatePdf(caseId) {
+  const bundle = getPdfBundle(caseId);
   if (!bundle) return;
   if (isMobilePdfEnvironment()) {
     openPdfPreview(bundle);
@@ -1971,8 +2010,8 @@ function generatePdf() {
   log(`已產生 ${bundle.filename}`);
 }
 
-async function sharePdf() {
-  const bundle = getPdfBundle();
+async function sharePdf(caseId) {
+  const bundle = getPdfBundle(caseId);
   if (!bundle) return;
   const shareData = bundle.file ? { files: [bundle.file] } : null;
   let canShareFiles = false;

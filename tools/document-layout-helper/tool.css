@@ -242,6 +242,14 @@ button:disabled { opacity: .55; cursor: wait; }
   margin-bottom: 8px;
 }
 
+.case-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .person {
   padding: 7px 0;
   border-top: 1px solid var(--line);
@@ -525,6 +533,8 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 @media (max-width: 920px) {
   .topbar { grid-template-columns: 1fr; align-items: start; }
   .topbar { display: grid; }
+  .case-head { align-items: flex-start; }
+  .case-head-actions { justify-content: flex-start; }
   .crop-grid { grid-template-columns: 1fr; }
   .crop-dialog {
     width: calc(100vw - 12px);
