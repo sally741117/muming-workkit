@@ -6,7 +6,7 @@
   <title>證件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260808-5">
+  <link rel="stylesheet" href="./tool.css?v=20260808-6">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -39,6 +39,7 @@
           </div>
           <button id="addCaseBtn" class="ghost" type="button">＋新增下一組案件</button>
         </div>
+        <div id="inAppBrowserNotice" class="in-app-browser-notice" role="status" hidden></div>
         <div id="statusLog" class="status-log" aria-live="polite"></div>
         <div id="cases"></div>
       </section>
@@ -57,6 +58,21 @@
   <footer class="site-footer">
     <a href="../../index.html">© 2026 MUMING 牧茗製作</a>
   </footer>
+
+  <dialog id="inAppBrowserDialog" class="in-app-browser-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <h2>請使用瀏覽器開啟</h2>
+        <button class="icon" value="cancel" aria-label="關閉" type="submit">×</button>
+      </div>
+      <p id="inAppBrowserMessage"></p>
+      <div class="dialog-actions in-app-browser-actions">
+        <button id="copyCurrentUrlBtn" class="primary" type="button">複製目前網址</button>
+        <button id="openExternalBrowserBtn" type="button">嘗試用外部瀏覽器開啟</button>
+        <button value="cancel" type="submit">關閉</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="cropDialog" class="crop-dialog">
     <form method="dialog" class="dialog-shell">
@@ -152,6 +168,6 @@
     </form>
   </dialog>
 
-  <script src="./app.js?v=20260808-11"></script>
+  <script src="./app.js?v=20260808-15"></script>
 </body>
 </html>

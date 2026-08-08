@@ -184,6 +184,18 @@ button:disabled { opacity: .55; cursor: wait; }
 
 .status-log:empty { display: none; }
 
+.in-app-browser-notice {
+  margin-bottom: 12px;
+  padding: 9px 11px;
+  border: 1px solid #e1c27d;
+  border-radius: 6px;
+  background: #fff8e8;
+  color: #73531a;
+  font-size: 13px;
+}
+
+.in-app-browser-notice[hidden] { display: none; }
+
 .card-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -432,6 +444,11 @@ dialog {
 }
 
 dialog::backdrop { background: rgba(20, 28, 28, .55); }
+
+.in-app-browser-dialog { width: min(520px, calc(100vw - 24px)); }
+.in-app-browser-dialog p { margin-bottom: 0; color: var(--muted); line-height: 1.7; }
+.in-app-browser-actions { flex-wrap: wrap; }
+
 .crop-dialog {
   max-height: calc(100vh - 28px);
   max-height: calc(100dvh - 28px);

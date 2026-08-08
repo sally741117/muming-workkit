@@ -36,6 +36,11 @@ const state = {
 const el = {
   engineStatus: document.querySelector("#engineStatus"),
   statusLog: document.querySelector("#statusLog"),
+  inAppBrowserNotice: document.querySelector("#inAppBrowserNotice"),
+  inAppBrowserDialog: document.querySelector("#inAppBrowserDialog"),
+  inAppBrowserMessage: document.querySelector("#inAppBrowserMessage"),
+  copyCurrentUrlBtn: document.querySelector("#copyCurrentUrlBtn"),
+  openExternalBrowserBtn: document.querySelector("#openExternalBrowserBtn"),
   cases: document.querySelector("#cases"),
   addCaseBtn: document.querySelector("#addCaseBtn"),
   previewTitle: document.querySelector("#previewTitle"),
@@ -95,6 +100,90 @@ function showToast(message) {
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => toast.classList.remove("show"), 3200);
 }
+
+function inAppBrowserInfo(userAgent = window.navigator.userAgent) {
+  const ua = userAgent || "";
+  if (/\bLine\/|\bLIFF\b/i.test(ua)) return { id: "line", name: "LINE" };
+  if (/FBAN|FBAV|FB_IAB|FB4A|FBIOS|MessengerForiOS|Orca-Android/i.test(ua)) {
+    return { id: "facebook", name: /MessengerForiOS|Orca-Android/i.test(ua) ? "Messenger" : "Facebook" };
+  }
+  if (/Instagram/i.test(ua)) return { id: "instagram", name: "Instagram" };
+  return null;
+}
+
+function isInAppBrowser(userAgent = window.navigator.userAgent) {
+  return Boolean(inAppBrowserInfo(userAgent));
+}
+
+function showInAppBrowserDialog(info = inAppBrowserInfo()) {
+  if (!info) return false;
+  el.inAppBrowserMessage.textContent = `目前使用的是 ${info.name} 內建瀏覽器，無法直接分享或下載 PDF。請改用 Chrome 或 Safari 開啟本工具。`;
+  if (!el.inAppBrowserDialog.open) el.inAppBrowserDialog.showModal();
+  requestAnimationFrame(() => el.copyCurrentUrlBtn.focus());
+  return true;
+}
+
+async function copyText(text) {
+  try {
+    if (window.navigator.clipboard?.writeText) {
+      await window.navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (_) {
+    // LINE and other embedded browsers may deny the Clipboard API.
+  }
+  const input = document.createElement("textarea");
+  input.value = text;
+  input.setAttribute("readonly", "");
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.select();
+  input.setSelectionRange(0, input.value.length);
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch (_) {
+    copied = false;
+  }
+  input.remove();
+  return copied;
+}
+
+async function copyCurrentUrl({ announce = true } = {}) {
+  const copied = await copyText(window.location.href);
+  if (announce) {
+    showToast(copied
+      ? "網址已複製，請貼到 Chrome 或 Safari 開啟。"
+      : "無法自動複製，請使用右上角選單以瀏覽器開啟。");
+  }
+  return copied;
+}
+
+async function tryOpenExternalBrowser() {
+  const opened = window.open(window.location.href, "_blank");
+  const copied = await copyCurrentUrl({ announce: false });
+  if (opened) {
+    try { opened.opener = null; } catch (_) { /* Cross-window restrictions are harmless here. */ }
+    showToast(copied
+      ? "已嘗試開啟；若仍在內建瀏覽器，網址也已複製。"
+      : "若仍在內建瀏覽器，請使用右上角選單以預設瀏覽器開啟。");
+    return;
+  }
+  showToast(copied
+    ? "無法自動開啟，網址已複製；請貼到 Chrome 或 Safari。"
+    : "請使用右上角選單選擇以預設瀏覽器開啟。");
+}
+
+function initInAppBrowserUx() {
+  const info = inAppBrowserInfo();
+  if (!info) return;
+  el.inAppBrowserNotice.hidden = false;
+  el.inAppBrowserNotice.textContent = `目前使用 ${info.name} 內建瀏覽器，PDF 分享請改用 Chrome／Safari。`;
+}
+
+el.copyCurrentUrlBtn.addEventListener("click", () => void copyCurrentUrl());
+el.openExternalBrowserBtn.addEventListener("click", () => void tryOpenExternalBrowser());
 
 function isMobilePdfEnvironment() {
   return window.matchMedia?.("(pointer: coarse)").matches
@@ -2078,6 +2167,10 @@ function downloadPdf(bundle) {
 }
 
 function generatePdf(caseId) {
+  if (isInAppBrowser()) {
+    showInAppBrowserDialog();
+    return;
+  }
   const bundle = getPdfBundle(caseId);
   if (!bundle) return;
   if (isMobilePdfEnvironment()) {
@@ -2091,6 +2184,10 @@ function generatePdf(caseId) {
 
 async function sharePdf(caseId, button) {
   if (button?.disabled) return;
+  if (isInAppBrowser()) {
+    showInAppBrowserDialog();
+    return;
+  }
   const originalLabel = button?.textContent || "分享 PDF";
   if (button) {
     button.disabled = true;
@@ -2123,7 +2220,6 @@ async function sharePdf(caseId, button) {
     if (!canShareFiles) {
       downloadPdf(bundle);
       const message = "此瀏覽器不支援直接分享，已改為下載 PDF。";
-      log(message);
       showToast(message);
       return;
     }
@@ -2139,7 +2235,6 @@ async function sharePdf(caseId, button) {
     const message = bundle
       ? "無法開啟分享，已改為下載 PDF。"
       : "無法產生 PDF，請稍後再試。";
-    log(message);
     showToast(message);
   } finally {
     if (button) {
@@ -2151,4 +2246,5 @@ async function sharePdf(caseId, button) {
 
 addDefaultCase();
 renderAll();
+initInAppBrowserUx();
 initEngines();
