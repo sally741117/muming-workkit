@@ -3,175 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>探索工具｜MUMING WorkKit</title>
-  <meta name="description" content="在 MUMING WorkKit 搜尋行政、工程、多語、文件、計算與流程工具。">
-  <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools.html">
-  <meta property="og:title" content="探索工具｜MUMING WorkKit">
-  <meta property="og:description" content="用功能分類與產業篩選快速找到可用工具。">
-  <meta property="og:type" content="website">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="assets/css/styles.css?v=20260802-contact-fix">
-  <meta name="theme-color" content="#0f3d2e">
-  <link rel="icon" href="data:,">
+  <title>MUMING WorkKit</title>
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="https://sally741117.github.io/muming-workkit/">
+  <meta http-equiv="refresh" content="0; url=index.html">
+  <script>
+    const target = new URL("index.html", window.location.href);
+    target.search = window.location.search;
+    target.hash = window.location.hash;
+    window.location.replace(target);
+  </script>
 </head>
-<body class="tools-workspace-page">
-<a class="skip-link" href="#main">跳到主要內容</a>
-<header class="site-header tools-mobile-header">
-  <div class="container nav">
-    <button class="workspace-menu-button" type="button" data-workspace-menu aria-label="開啟工具導覽" aria-expanded="false">&#9776;</button>
-    <a class="brand" href="index.html"><span class="brand-mark">WK</span><span>MUMING WorkKit<small>牧茗產業工具平台</small></span></a>
-    <button class="menu-toggle" data-menu-toggle aria-label="開啟選單" aria-expanded="false"><span></span><span></span><span></span></button>
-    <nav class="nav-links" data-nav-menu>
-      <a href="index.html">首頁</a>
-      <a aria-current="page" href="tools.html">探索工具</a>
-      <a href="industries.html">產業工具包</a>
-      <a href="about.html">關於平台</a>
-    </nav>
-  </div>
-</header>
-<div class="workspace-shell" data-tool-explorer>
-  <aside class="workspace-sidebar" data-workspace-sidebar aria-label="開啟工具導覽">
-    <div class="workspace-brand workspace-brand--method">
-      <a href="index.html" aria-label="MUMING WorkKit"><span class="workspace-brand__muming">MUMING</span><strong>WorkKit</strong><small>&#29287;&#33559;&#29986;&#26989;&#24037;&#20316;&#24179;&#21488;</small></a>
-      <p>&#25226;&#29986;&#26989;&#32147;&#39511;&#65292;&#25972;&#29702;&#25104;&#21487;&#30452;&#25509;&#20351;&#29992;&#30340;&#24037;&#20855;&#12290;</p>
-    </div>
-    <div class="sidebar-stats" data-sidebar-stats>
-      <div><strong data-stat="tools">0</strong><span>&#20840;&#37096;&#24037;&#20855;</span></div>
-      <div><strong data-stat="available">0</strong><span>&#27491;&#24335;&#21487;&#29992;</span></div>
-      <div><strong data-stat="testingPlanning">0</strong><span>&#28204;&#35430;&#29256;&#65295;&#35215;&#21123;&#38283;&#30332;&#20013;</span></div>
-    </div>
-    <nav class="workspace-nav">
-      <p class="workspace-nav-label">&#20027;&#35201;&#23566;&#35261;</p>
-      <a href="index.html"><span>&#8962;</span>&#39318;&#38913;</a>
-      <button class="is-active" type="button" data-tool-nav data-tool-category="all"><span>&#9633;</span>&#25506;&#32034;&#24037;&#20855;</button>
-      <button type="button" data-tool-nav data-tool-quick="recent"><span>&#8634;</span>&#26368;&#36817;&#20351;&#29992;</button>
-      <button type="button" data-tool-nav data-tool-quick="favorites"><span>&#9733;</span>&#25105;&#30340;&#25910;&#34255;</button>
-      <hr>
-      <p class="workspace-nav-label">&#24037;&#20316;&#24773;&#22659;</p>
-      <button type="button" data-tool-nav data-tool-category="all"><span>&#9633;</span>&#20840;&#37096;&#24037;&#20855;</button>
-      <button type="button" data-tool-nav data-tool-category="message"><span>&#9993;</span>&#35338;&#24687;&#33287;&#36890;&#30693;</button>
-      <button type="button" data-tool-nav data-tool-category="calculation"><span>&#20272;</span>&#35336;&#31639;&#35430;&#31639;</button>
-      <button type="button" data-tool-nav data-tool-category="document"><span>&#25991;</span>&#25991;&#20214;&#34920;&#21934;</button>
-      <button type="button" data-tool-nav data-tool-category="checklist"><span>&#10003;</span>&#28165;&#21934;&#27969;&#31243;</button>
-      <button type="button" data-tool-nav data-tool-category="multilingual"><span>&#35695;</span>&#22810;&#35486;&#28317;&#36890;</button>
-      <hr>
-      <p class="workspace-nav-label">依產業找工具包</p>
-      <button type="button" data-tool-nav data-tool-industry-nav="all"><span>&#9671;</span>全部產業</button>
-      <button type="button" data-tool-nav data-tool-industry-nav="skilled-trades"><span>&#24037;</span>&#24037;&#31243;&#32887;&#20154;</button>
-      <button type="button" data-tool-nav data-tool-industry-nav="admin-hr"><span>&#20154;</span>&#34892;&#25919;&#20154;&#36039;</button>
-      <button type="button" data-tool-nav data-tool-industry-nav="foreign-workforce"><span>&#22806;</span>外籍移工仲介</button>
-      <button type="button" data-tool-nav data-tool-industry-nav="factory"><span>&#24288;</span>&#24037;&#24288;&#31649;&#29702;</button>
-      <button type="button" data-tool-nav data-tool-industry-nav="consulting-sales"><span>&#26989;</span>&#39015;&#21839;&#26989;&#21209;</button>
-      <button type="button" data-tool-nav data-tool-industry-nav="all" data-industry-more="true"><span>+</span>&#26356;&#22810;&#29986;&#26989;</button>
-      <hr>
-      <p class="workspace-nav-label">&#20854;&#20182;</p>
-      <a href="about.html"><span>?</span>&#20351;&#29992;&#35498;&#26126;</a>
-      <a href="about.html"><span>i</span>&#38364;&#26044;&#24179;&#21488;</a>
-    </nav>
-    <div class="sidebar-powered"><span>Powered by</span><strong>MUMING METHOD</strong><small>&#38656;&#27714;&#25972;&#29702;&#12539;&#27969;&#31243;&#25286;&#35299;&#12539;&#24037;&#20855;&#21270;</small></div>
-  </aside>
-
-  <div class="workspace-backdrop" data-workspace-backdrop hidden></div>
-  <main id="main" class="workspace-main">
-    <section class="workspace-toolbar workspace-toolbar--minimal" aria-label="頁面工具列">
-      <div class="workspace-toolbar-note"><span>探索工具</span><strong>依工作找解法</strong></div>
-      <div class="workspace-top-actions" aria-label="其他"><span>公開測試版</span><button type="button" data-tool-nav data-tool-quick="favorites">★ 我的收藏</button><a href="about.html">關於／說明</a></div>
-    </section>
-    <div class="workspace-content-shell">
-      <div class="workspace-center">
-        <section class="workspace-heading workspace-heading--method">
-          <div><p class="eyebrow">SaaS workspace</p><h1>今天要解決哪一項工作？</h1><p>先選工作情境，或直接搜尋你的需求。進階篩選可以等需要時再打開。</p></div>
-          <div class="method-card method-card--compact" aria-label="MUMING METHOD"><strong>MUMING METHOD</strong><span>需求整理 → 流程拆解 → 工具化</span></div>
-        </section>
-        <section class="browse-mode-grid browse-mode-grid--compact" role="tablist" aria-label="瀏覽模式">
-          <button class="browse-mode-card is-active" type="button" role="tab" data-mode="work" aria-selected="true">
-            <span>依工作找工具</span>
-            <h2>從現在要完成的工作開始</h2>
-            <p>先選常見工作情境，再查看可用工具。</p>
-          </button>
-          <button class="browse-mode-card" type="button" role="tab" data-mode="industry" aria-selected="false">
-            <span>依產業找工具包</span>
-            <h2>從產業情境查看工具組合</h2>
-            <p>依工程職人、行政人資、外籍人力等情境整理。</p>
-          </button>
-        </section>
-        <section class="work-intent-panel" data-work-mode-panel aria-label="工作情境與搜尋">
-          <div class="work-intent-head"><span>第二步</span><h2>你現在想完成什麼工作？</h2><p>選一個常見工作，或直接輸入你的需求。</p></div>
-          <form class="workspace-search work-intent-search" onsubmit="return false;">
-            <input data-tool-search type="search" placeholder="例如：我要通知移工、計算費用、製作文件……" aria-label="搜尋工作需求或工具">
-            <button class="button button-small button-primary" type="submit">搜尋</button>
-            <small>找不到合適情境？直接搜尋工作需求。</small>
-          </form>
-          <div class="work-scenario-grid" data-work-scenarios aria-label="常見工作情境">
-            <button type="button" data-work-scenario="notify"><span>訊</span><strong>我要通知</strong></button>
-            <button type="button" data-work-scenario="cost"><span>算</span><strong>我要計算費用</strong></button>
-            <button type="button" data-work-scenario="document"><span>文</span><strong>我要製作文件</strong></button>
-            <button type="button" data-work-scenario="tracking"><span>進</span><strong>我要追蹤進度</strong></button>
-            <button type="button" data-work-scenario="translate"><span>譯</span><strong>我要翻譯</strong></button>
-            <button type="button" data-work-scenario="interview"><span>面</span><strong>我要安排面試</strong></button>
-            <button type="button" data-work-scenario="schedule"><span>班</span><strong>我要排班</strong></button>
-            <button type="button" data-work-scenario="inspection"><span>檢</span><strong>我要巡檢</strong></button>
-          </div>
-          <div class="advanced-filter-box">
-            <button class="filter-toggle advanced-filter-toggle" type="button" data-filter-toggle aria-expanded="false">進階篩選</button>
-            <div class="workspace-controls advanced-filter-panel" data-filter-panel>
-              <label>產業
-                <select class="control" data-tool-industry>
-                  <option value="all">全部產業</option>
-                  <option value="admin-hr">行政人資</option>
-                  <option value="skilled-trades">工程職人</option>
-                  <option value="foreign-workforce">外籍移工仲介</option>
-                  <option value="factory">工廠管理</option>
-                  <option value="consulting-sales">顧問業務</option>
-                </select>
-              </label>
-              <label>狀態
-                <select class="control" data-tool-status aria-label="狀態">
-                  <option value="all">全部狀態</option>
-                  <option value="正式可用">正式可用</option>
-                  <option value="測試版">測試版</option>
-                  <option value="開發中">開發中</option>
-                </select>
-              </label>
-              <label>排序
-                <select class="control" data-tool-sort aria-label="排序">
-                  <option value="recommended">推薦</option>
-                  <option value="latest">最新</option>
-                  <option value="name">名稱</option>
-                </select>
-              </label>
-              <button class="button button-small button-outline" type="button" data-clear-filters>清除全部條件</button>
-            </div>
-          </div>
-        </section>
-        <section class="workspace-active-filters" data-work-mode-panel data-active-filters aria-label="目前條件"></section>
-        <section class="featured-tool-panel featured-tool-panel--dynamic" data-work-mode-panel data-featured-tools aria-label="推薦工具"></section>
-        <section class="industry-mode-panel" data-industry-mode-panel hidden aria-label="產業解法">
-          <div class="industry-mode-head"><span>產業解法</span><h2>依產業情境整理工具組合</h2><p>由現有工具資料計算每個產業的工具狀態，直接在本頁瀏覽，不跳轉到其他頁面。</p></div>
-          <div class="industry-solution-grid" data-industry-solutions></div>
-          <div class="industry-related-panel" data-industry-related></div>
-        </section>
-        <section class="workspace-results" data-work-mode-panel><div class="workspace-result-head">工具結果 <strong data-result-count>0</strong> 個</div><div class="workspace-tool-grid" data-tool-list></div><div class="empty-state workspace-empty" data-empty-state hidden><h2>找不到符合條件的工具</h2><p>可以移除部分條件、清除全部篩選，或改用較短關鍵字描述你的工作需求。</p><div class="empty-actions"><button class="button button-small button-secondary" type="button" data-clear-filters>清除全部篩選</button><button class="button button-small button-outline" type="button" data-relax-status>查看測試版／規劃中工具</button></div></div></section>
-      </div>
-      <aside class="workspace-side-panel" aria-label="&#24179;&#21488;&#32317;&#35261;">
-        <section class="side-card side-card--overview"><h2>&#24179;&#21488;&#32317;&#35261;</h2><div class="side-stat-grid" data-platform-overview></div></section>
-        <section class="side-card"><h2>&#24037;&#20316;&#20998;&#39006;</h2><div data-category-summary></div></section>
-        <section class="side-card"><h2>&#26368;&#36817;&#26356;&#26032;</h2><div data-recent-updates></div></section>
-        <section class="side-card"><h2>&#26368;&#36817;&#20351;&#29992;</h2><div data-recent-tools><p class="side-empty">&#23578;&#28961;&#26368;&#36817;&#20351;&#29992;&#24037;&#20855;</p></div></section>
-        <section class="side-card"><h2>&#25105;&#30340;&#25910;&#34255;</h2><div data-favorite-tools><p class="side-empty">&#23578;&#26410;&#25910;&#34255;&#24037;&#20855;</p></div></section>
-        <section class="side-card side-card--help"><h2>&#38656;&#35201;&#21332;&#21161;&#65311;</h2><p>&#29287;&#33559;&#39015;&#21839;&#22296;&#38538;&#21487;&#21332;&#21161;&#20225;&#26989;&#25972;&#29702;&#38656;&#27714;&#33287;&#35215;&#21123;&#24037;&#20316;&#24037;&#20855;&#12290;</p><a class="button button-small button-secondary" href="mailto:muming9000@gmail.com?subject=MUMING%20WorkKit%20%E4%BC%81%E6%A5%AD%E5%B7%A5%E5%85%B7%E9%9C%80%E6%B1%82">&#32879;&#32097;&#25105;&#20497; &#8594;</a></section>
-      </aside>
-    </div>
-  </main>
-</div>
-<footer class="site-footer workspace-footer">
-  <div class="container footer-grid">
-    <div><strong>由牧茗管理顧問有限公司規劃與開發</strong><p>Mu Ming Management Consulting Co., Ltd.</p><p><a href="https://sally741117.github.io/muming-website/">回到牧茗官網</a></p></div>
-    <nav class="footer-links"><a href="about.html">關於平台</a><a href="privacy.html">隱私權政策</a><a href="terms.html">使用條款</a><a href="mailto:muming9000@gmail.com?subject=MUMING%20WorkKit%20%E4%BD%BF%E7%94%A8%E5%9B%9E%E9%A5%8B">意見回饋</a><a href="mailto:muming9000@gmail.com">聯絡我們</a></nav>
-  </div>
-</footer>
-<script src="assets/js/tools-data.js?v=20260808-document-layout"></script>
-<script src="assets/js/analytics.js?v=20260801"></script>
-<script src="assets/js/main.js?v=20260808-document-layout"></script>
+<body>
+  <p><a href="index.html">Continue to MUMING WorkKit</a></p>
 </body>
 </html>
