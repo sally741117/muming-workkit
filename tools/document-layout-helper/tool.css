@@ -19,6 +19,44 @@ body {
   font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
 }
 
+body.crop-modal-open {
+  position: fixed;
+  right: 0;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+body.crop-handle-dragging {
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+.workkit-toast {
+  position: fixed;
+  z-index: 9999;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: 16px;
+  width: fit-content;
+  max-width: min(460px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #22302f;
+  color: #fff;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity .16s ease, transform .16s ease;
+}
+
+.workkit-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -398,6 +436,13 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   max-height: calc(100vh - 28px);
   max-height: calc(100dvh - 28px);
   overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.crop-dialog.crop-dragging {
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 .dialog-shell { position: relative; padding: 16px; }
 .dialog-head, .dialog-actions, .crop-tools, .viewer-switch {
@@ -459,6 +504,9 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   display: grid;
   place-items: center;
   touch-action: none;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .crop-source { min-width: 0; }
@@ -474,6 +522,8 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 #cropCanvas {
   max-width: 100%;
   max-height: 72vh;
+  touch-action: none;
+  -webkit-user-drag: none;
 }
 
 #cropOverlay {
@@ -495,6 +545,7 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 .handle-hit {
   fill: transparent;
   pointer-events: all;
+  touch-action: none;
 }
 
 .handle-dot { pointer-events: none; }

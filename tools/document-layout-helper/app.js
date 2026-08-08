@@ -19,6 +19,7 @@ const state = {
   cropOpener: null,
   cropRestoreFocus: true,
   cropFocusBeforeDiscard: null,
+  cropPageScrollY: 0,
   viewerId: null,
   viewerMode: "original",
   selectedCardId: null,
@@ -77,6 +78,22 @@ function log(message) {
   const line = document.createElement("div");
   line.textContent = message;
   el.statusLog.prepend(line);
+}
+
+function showToast(message) {
+  let toast = document.querySelector("#workkitToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "workkitToast";
+    toast.className = "workkit-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove("show"), 3200);
 }
 
 function isMobilePdfEnvironment() {
@@ -252,7 +269,7 @@ function renderCases() {
       if (action === "delete-case") deleteCase(item.id);
       if (action === "preview-case") renderA4Preview(item.id);
       if (action === "pdf-case") generatePdf(item.id);
-      if (action === "share-pdf-case") void sharePdf(item.id);
+      if (action === "share-pdf-case") void sharePdf(item.id, event.target.closest("button"));
     });
     el.cases.appendChild(box);
   });
@@ -1395,6 +1412,21 @@ function assignmentDetails(cardId) {
   };
 }
 
+function lockCropBackground() {
+  if (document.body.classList.contains("crop-modal-open")) return;
+  state.cropPageScrollY = window.scrollY;
+  document.body.style.top = `-${state.cropPageScrollY}px`;
+  document.body.classList.add("crop-modal-open");
+}
+
+function unlockCropBackground() {
+  if (!document.body.classList.contains("crop-modal-open")) return;
+  const scrollY = state.cropPageScrollY;
+  document.body.classList.remove("crop-modal-open", "crop-handle-dragging");
+  document.body.style.top = "";
+  window.scrollTo(0, scrollY);
+}
+
 async function openCrop(cardId, opener = document.activeElement) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
@@ -1434,6 +1466,7 @@ async function openCrop(cardId, opener = document.activeElement) {
     normalizedToRotatedPoints(candidate, state.cropRotation, card.originalWidth, card.originalHeight)
   );
   state.cropCandidateIndex = 0;
+  lockCropBackground();
   el.cropDialog.showModal();
   requestAnimationFrame(() => {
     fitOverlay();
@@ -1545,7 +1578,43 @@ function drawCropOverlay() {
 
 let draggingHandle = null;
 let draggingPointerId = null;
+let draggingCaptureTarget = null;
+let cropDragStart = null;
+let cropDragMoved = false;
+let suppressCropClickUntil = 0;
 const cropHandleLabels = ["左上角", "右上角", "右下角", "左下角"];
+
+function preventCropDragScroll(event) {
+  if (draggingHandle === null) return;
+  event.preventDefault();
+}
+
+function setCropDragging(active) {
+  el.cropDialog.classList.toggle("crop-dragging", active);
+  el.cropCanvas.parentElement.classList.toggle("crop-dragging", active);
+  document.body.classList.toggle("crop-handle-dragging", active);
+  if (active) {
+    document.addEventListener("touchmove", preventCropDragScroll, { passive: false, capture: true });
+  } else {
+    document.removeEventListener("touchmove", preventCropDragScroll, true);
+  }
+}
+
+function clearCropPointerDrag(pointerId = draggingPointerId) {
+  const captureTarget = draggingCaptureTarget;
+  draggingHandle = null;
+  draggingPointerId = null;
+  draggingCaptureTarget = null;
+  cropDragStart = null;
+  setCropDragging(false);
+  if (captureTarget && pointerId !== null) {
+    try {
+      if (captureTarget.hasPointerCapture(pointerId)) captureTarget.releasePointerCapture(pointerId);
+    } catch (_) {
+      // Pointer capture may already be released after cancellation.
+    }
+  }
+}
 
 function updateCropHandleHint() {
   const label = cropHandleLabels[state.activeCropHandle];
@@ -1588,19 +1657,26 @@ function moveActiveCropHandle(key, fast = false) {
 el.cropOverlay.addEventListener("pointerdown", (event) => {
   const handle = event.target.closest?.(".handle");
   if (!handle) return;
-  event.preventDefault();
+  if (event.cancelable) event.preventDefault();
   draggingHandle = Number(handle.dataset.index);
   draggingPointerId = event.pointerId;
+  draggingCaptureTarget = handle;
+  cropDragStart = { x: event.clientX, y: event.clientY };
+  cropDragMoved = false;
   setActiveCropHandle(draggingHandle, event.pointerType !== "touch");
+  setCropDragging(true);
   try {
-    el.cropOverlay.setPointerCapture(event.pointerId);
+    handle.setPointerCapture(event.pointerId);
   } catch (_) {
     // Synthetic events may not represent an active pointer; real input still uses capture.
   }
 });
 el.cropOverlay.addEventListener("pointermove", (event) => {
   if (draggingHandle === null || event.pointerId !== draggingPointerId) return;
-  event.preventDefault();
+  if (event.cancelable) event.preventDefault();
+  if (cropDragStart && Math.hypot(event.clientX - cropDragStart.x, event.clientY - cropDragStart.y) > 4) {
+    cropDragMoved = true;
+  }
   const rect = el.cropCanvas.getBoundingClientRect();
   state.cropPoints[draggingHandle] = imagePoint({ x: event.clientX - rect.left, y: event.clientY - rect.top });
   state.cropDirty = true;
@@ -1611,22 +1687,23 @@ el.cropOverlay.addEventListener("pointermove", (event) => {
 function endCropPointer(event) {
   if (draggingPointerId === null || event.pointerId !== draggingPointerId) return;
   if (event.cancelable) event.preventDefault();
-  try {
-    if (el.cropOverlay.hasPointerCapture(event.pointerId)) {
-      el.cropOverlay.releasePointerCapture(event.pointerId);
-    }
-  } catch (_) {
-    // The browser may already have released capture after cancellation.
-  }
-  draggingHandle = null;
-  draggingPointerId = null;
+  if (cropDragMoved) suppressCropClickUntil = performance.now() + 500;
+  clearCropPointerDrag(event.pointerId);
 }
 
 el.cropOverlay.addEventListener("pointerup", endCropPointer);
 el.cropOverlay.addEventListener("pointercancel", endCropPointer);
 el.cropOverlay.addEventListener("lostpointercapture", () => {
-  draggingHandle = null;
-  draggingPointerId = null;
+  if (draggingHandle !== null) clearCropPointerDrag();
+});
+el.cropOverlay.addEventListener("click", (event) => {
+  if (performance.now() > suppressCropClickUntil) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  suppressCropClickUntil = 0;
+}, true);
+el.cropOverlay.addEventListener("contextmenu", (event) => {
+  if (draggingHandle !== null) event.preventDefault();
 });
 el.cropOverlay.addEventListener("focusin", (event) => {
   const handle = event.target.closest(".handle");
@@ -1843,6 +1920,8 @@ el.cropDialog.addEventListener("close", () => {
   const opener = state.cropOpener;
   const cardId = state.activeCropId;
   const shouldRestore = state.cropRestoreFocus;
+  clearCropPointerDrag();
+  unlockCropBackground();
   state.activeCropId = null;
   state.cropOpener = null;
   if (!shouldRestore) return;
@@ -2010,36 +2089,63 @@ function generatePdf(caseId) {
   log(`已產生 ${bundle.filename}`);
 }
 
-async function sharePdf(caseId) {
-  const bundle = getPdfBundle(caseId);
-  if (!bundle) return;
-  const shareData = bundle.file ? { files: [bundle.file] } : null;
-  let canShareFiles = false;
-  try {
-    canShareFiles = Boolean(
-      shareData
-      && navigator.share
-      && navigator.canShare
-      && navigator.canShare(shareData)
-    );
-  } catch (_) {
-    canShareFiles = false;
+async function sharePdf(caseId, button) {
+  if (button?.disabled) return;
+  const originalLabel = button?.textContent || "分享 PDF";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "準備分享…";
   }
-  if (!canShareFiles) {
-    openPdfPreview(bundle);
-    log("此瀏覽器不支援直接分享檔案，已開啟 PDF，請使用瀏覽器分享或儲存到檔案");
-    return;
-  }
+  let bundle = null;
   try {
-    await navigator.share({
+    bundle = getPdfBundle(caseId);
+    if (!bundle) {
+      showToast("此案件尚未放入任何證件。");
+      return;
+    }
+    const caseItem = state.cases.find((item) => item.id === caseId);
+    const shareData = bundle.file ? {
       files: [bundle.file],
-      title: "證件影本"
+      title: "證件影本",
+      text: `${caseItem?.title || "案件"}證件影本`
+    } : null;
+    let canShareFiles = false;
+    try {
+      canShareFiles = Boolean(
+        shareData
+        && typeof navigator.share === "function"
+        && typeof navigator.canShare === "function"
+        && navigator.canShare({ files: shareData.files })
+      );
+    } catch (error) {
+      console.warn("PDF file sharing capability check failed.", error);
+    }
+    if (!canShareFiles) {
+      downloadPdf(bundle);
+      const message = "此瀏覽器不支援直接分享，已改為下載 PDF。";
+      log(message);
+      showToast(message);
+      return;
+    }
+    await navigator.share({
+      files: shareData.files,
+      title: shareData.title,
+      text: shareData.text
     });
   } catch (error) {
     if (error?.name === "AbortError") return;
-    console.warn("PDF share failed; opening preview instead.", error);
-    openPdfPreview(bundle);
-    log("分享功能未完成，已改為開啟 PDF 預覽");
+    console.error("PDF share failed.", error);
+    if (bundle) downloadPdf(bundle);
+    const message = bundle
+      ? "無法開啟分享，已改為下載 PDF。"
+      : "無法產生 PDF，請稍後再試。";
+    log(message);
+    showToast(message);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
   }
 }
 
