@@ -386,6 +386,11 @@ dialog {
 }
 
 dialog::backdrop { background: rgba(20, 28, 28, .55); }
+.crop-dialog {
+  max-height: calc(100vh - 28px);
+  max-height: calc(100dvh - 28px);
+  overflow: auto;
+}
 .dialog-shell { position: relative; padding: 16px; }
 .dialog-head, .dialog-actions, .crop-tools, .viewer-switch {
   display: flex;
@@ -445,6 +450,7 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   overflow: hidden;
   display: grid;
   place-items: center;
+  touch-action: none;
 }
 
 .crop-source { min-width: 0; }
@@ -454,6 +460,8 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   color: var(--muted);
   font-size: 12px;
 }
+
+.touch-crop-hint { display: none; }
 
 #cropCanvas {
   max-width: 100%;
@@ -466,21 +474,32 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   width: 100%;
   height: 100%;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .handle {
   cursor: grab;
   pointer-events: auto;
   outline: none;
+  touch-action: none;
 }
 
-.handle:hover,
-.handle.active,
-.handle:focus {
+.handle-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.handle-dot { pointer-events: none; }
+
+.handle:hover .handle-dot,
+.handle.active .handle-dot,
+.handle:focus .handle-dot {
   stroke: #f2b134;
   stroke-width: 5;
   filter: drop-shadow(0 0 3px rgba(255, 255, 255, .95));
 }
+
+.handle.active { cursor: grabbing; }
 
 #cropCanvas:focus-visible {
   outline: 3px solid #f2b134;
@@ -507,7 +526,44 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   .topbar { grid-template-columns: 1fr; align-items: start; }
   .topbar { display: grid; }
   .crop-grid { grid-template-columns: 1fr; }
+  .crop-dialog {
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+    max-height: calc(100dvh - 12px);
+  }
+  .crop-dialog .dialog-shell { padding: 12px 12px 0; }
+  .crop-stage {
+    min-height: 0;
+    max-height: 50vh;
+    max-height: 50dvh;
+    aspect-ratio: 4 / 3;
+  }
+  #cropCanvas {
+    max-height: 50vh;
+    max-height: 50dvh;
+  }
+  .crop-preview { min-width: 0; }
+  .crop-preview canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+  .crop-dialog > .dialog-shell > .dialog-actions {
+    position: sticky;
+    z-index: 4;
+    bottom: 0;
+    margin: 12px -12px 0;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: rgba(255, 255, 255, .98);
+  }
   .page { transform-origin: top center; zoom: .72; }
+}
+
+@media (pointer: coarse) {
+  .keyboard-crop-hint { display: none; }
+  .touch-crop-hint { display: inline; }
+  .crop-dialog button { min-height: 44px; }
 }
 
 @media print {

@@ -27,7 +27,8 @@ const state = {
   fileChooserCallback: null,
   pointerDrag: null,
   cvReady: false,
-  pdfReady: false
+  pdfReady: false,
+  pdfCache: null
 };
 
 const el = {
@@ -37,6 +38,7 @@ const el = {
   addCaseBtn: document.querySelector("#addCaseBtn"),
   previewBtn: document.querySelector("#previewBtn"),
   pdfBtn: document.querySelector("#pdfBtn"),
+  sharePdfBtn: document.querySelector("#sharePdfBtn"),
   a4Preview: document.querySelector("#a4Preview"),
   cropDialog: document.querySelector("#cropDialog"),
   cropAssignmentContext: document.querySelector("#cropAssignmentContext"),
@@ -78,6 +80,25 @@ function log(message) {
   el.statusLog.prepend(line);
 }
 
+function isMobilePdfEnvironment() {
+  return window.matchMedia?.("(pointer: coarse)").matches
+    || /Android|iPad|iPhone|iPod/i.test(navigator.userAgent)
+    || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
+function updatePdfActions() {
+  if (!el.pdfBtn) return;
+  el.pdfBtn.textContent = state.pdfCache
+    ? (isMobilePdfEnvironment() ? "開啟 PDF" : "下載 PDF")
+    : "產生 PDF";
+}
+
+function invalidatePdfCache() {
+  if (state.pdfCache?.objectUrl) URL.revokeObjectURL(state.pdfCache.objectUrl);
+  state.pdfCache = null;
+  updatePdfActions();
+}
+
 function waitForCv() {
   return new Promise((resolve) => {
     const check = () => {
@@ -108,6 +129,7 @@ async function initEngines() {
 }
 
 function addDefaultCase() {
+  invalidatePdfCache();
   state.cases.push({
     id: uid("case"),
     title: `案件 ${state.cases.length + 1}`,
@@ -396,6 +418,7 @@ el.cardChoiceDialog.addEventListener("cancel", (event) => {
 });
 
 function addPerson(caseId) {
+  invalidatePdfCache();
   const found = state.cases.find((item) => item.id === caseId);
   const count = found.people.filter((p) => !p.fixed).length + 1;
   found.people.push({ id: uid("person"), role: `其他家屬 ${count}`, front: null, back: null, fixed: false });
@@ -403,6 +426,7 @@ function addPerson(caseId) {
 }
 
 function deletePerson(caseId, personId) {
+  invalidatePdfCache();
   const found = state.cases.find((item) => item.id === caseId);
   const person = found?.people.find((item) => item.id === personId);
   const removedIds = new Set(person ? [person.front, person.back].filter(Boolean) : []);
@@ -412,6 +436,7 @@ function deletePerson(caseId, personId) {
 }
 
 function deleteCase(caseId) {
+  invalidatePdfCache();
   const found = state.cases.find((item) => item.id === caseId);
   const removedIds = new Set(found?.people.flatMap((person) => [person.front, person.back]).filter(Boolean) || []);
   state.cards = state.cards.filter((card) => !removedIds.has(card.id));
@@ -461,6 +486,7 @@ function assignCard(cardId, caseId, personId, side, options = {}) {
   }
   target[side] = cardId;
   setCardAssignment(cardId, caseId, personId, side);
+  invalidatePdfCache();
   renderAll();
   options.afterAssign?.();
   return true;
@@ -528,12 +554,14 @@ function unassignCard(cardId, rerender = true) {
 function removeCard(cardId) {
   unassignCard(cardId, false);
   state.cards = state.cards.filter((card) => card.id !== cardId);
+  invalidatePdfCache();
   renderAll();
 }
 
 el.addCaseBtn.addEventListener("click", () => { addDefaultCase(); renderAll(); });
 el.previewBtn.addEventListener("click", renderA4Preview);
 el.pdfBtn.addEventListener("click", generatePdf);
+el.sharePdfBtn.addEventListener("click", sharePdf);
 
 async function processFiles(files, options = {}) {
   if (!files.length) return [];
@@ -1109,6 +1137,7 @@ async function rotateCard(cardId, degrees) {
   card.rotation = normalizeRotation(card.rotation + degrees);
   card.lastAppliedCrop.rotation = card.rotation;
   await rebuildCardFromCropState(card);
+  invalidatePdfCache();
   renderAll();
 }
 
@@ -1139,6 +1168,7 @@ async function autoCropCard(cardId) {
   );
   card.frameCandidateIndex = 0;
   card.faceHint = suggestCardSide(out);
+  invalidatePdfCache();
   renderAll();
 }
 
@@ -1194,6 +1224,7 @@ function applyReplacementCard(target, replacement, addedIds) {
   target.lastCropResult = replacement.lastCropResult;
   const ids = addedIds instanceof Set ? addedIds : new Set(addedIds);
   state.cards = state.cards.filter((item) => !ids.has(item.id));
+  invalidatePdfCache();
 }
 
 function canvasFromDataUrl(dataUrl) {
@@ -1485,25 +1516,25 @@ function drawCropOverlay() {
   if (el.cropOverlay.querySelectorAll(".handle").length !== 4) {
     el.cropOverlay.innerHTML = `
       <polygon fill="rgba(17,97,93,.18)" stroke="#30c2b3" stroke-width="2"></polygon>
-      ${pts.map((p, i) => `<circle class="handle" data-index="${i}" tabindex="0" role="slider" aria-label="${labels[i]}" r="9" fill="#fff" stroke="#11615d" stroke-width="3"></circle>`).join("")}`;
+      ${pts.map((p, i) => `<g class="handle" data-index="${i}" tabindex="0" role="slider" aria-label="${labels[i]}"><circle class="handle-hit" r="22"></circle><circle class="handle-dot" r="9" fill="#fff" stroke="#11615d" stroke-width="3"></circle></g>`).join("")}`;
   }
   el.cropOverlay.querySelector("polygon").setAttribute("points", pts.map((p) => `${p.x},${p.y}`).join(" "));
   el.cropOverlay.querySelectorAll(".handle").forEach((handle, index) => {
-    handle.setAttribute("cx", pts[index].x);
-    handle.setAttribute("cy", pts[index].y);
+    handle.setAttribute("transform", `translate(${pts[index].x} ${pts[index].y})`);
     handle.setAttribute("aria-valuetext", `x ${Math.round(state.cropPoints[index].x)}，y ${Math.round(state.cropPoints[index].y)}`);
     handle.classList.toggle("active", state.activeCropHandle === index);
   });
 }
 
 let draggingHandle = null;
+let draggingPointerId = null;
 const cropHandleLabels = ["左上角", "右上角", "右下角", "左下角"];
 
 function updateCropHandleHint() {
   const label = cropHandleLabels[state.activeCropHandle];
-  el.cropHandleHint.textContent = label
-    ? `目前：${label}｜方向鍵微調，Shift＋方向鍵快速移動`
-    : "使用方向鍵微調，Shift＋方向鍵快速移動";
+  const prefix = label ? `目前：${label}｜` : "";
+  el.cropHandleHint.querySelector(".keyboard-crop-hint").textContent = `${prefix}使用方向鍵微調，Shift＋方向鍵快速移動`;
+  el.cropHandleHint.querySelector(".touch-crop-hint").textContent = `${prefix}拖曳四角調整裁切範圍`;
 }
 
 function setActiveCropHandle(index, focus = false) {
@@ -1538,23 +1569,48 @@ function moveActiveCropHandle(key, fast = false) {
 }
 
 el.cropOverlay.addEventListener("pointerdown", (event) => {
-  const handle = event.target.closest(".handle");
+  const handle = event.target.closest?.(".handle");
   if (!handle) return;
+  event.preventDefault();
   draggingHandle = Number(handle.dataset.index);
-  setActiveCropHandle(draggingHandle, true);
-  handle.setPointerCapture(event.pointerId);
+  draggingPointerId = event.pointerId;
+  setActiveCropHandle(draggingHandle, event.pointerType !== "touch");
+  try {
+    el.cropOverlay.setPointerCapture(event.pointerId);
+  } catch (_) {
+    // Synthetic events may not represent an active pointer; real input still uses capture.
+  }
 });
 el.cropOverlay.addEventListener("pointermove", (event) => {
-  if (draggingHandle === null) return;
-  const rect = el.cropOverlay.getBoundingClientRect();
+  if (draggingHandle === null || event.pointerId !== draggingPointerId) return;
+  event.preventDefault();
+  const rect = el.cropCanvas.getBoundingClientRect();
   state.cropPoints[draggingHandle] = imagePoint({ x: event.clientX - rect.left, y: event.clientY - rect.top });
   state.cropDirty = true;
   state.cropManuallyAdjusted = true;
   drawCropOverlay();
   updateCorrectedPreview();
 });
-el.cropOverlay.addEventListener("pointerup", () => { draggingHandle = null; });
-el.cropOverlay.addEventListener("pointercancel", () => { draggingHandle = null; });
+function endCropPointer(event) {
+  if (draggingPointerId === null || event.pointerId !== draggingPointerId) return;
+  if (event.cancelable) event.preventDefault();
+  try {
+    if (el.cropOverlay.hasPointerCapture(event.pointerId)) {
+      el.cropOverlay.releasePointerCapture(event.pointerId);
+    }
+  } catch (_) {
+    // The browser may already have released capture after cancellation.
+  }
+  draggingHandle = null;
+  draggingPointerId = null;
+}
+
+el.cropOverlay.addEventListener("pointerup", endCropPointer);
+el.cropOverlay.addEventListener("pointercancel", endCropPointer);
+el.cropOverlay.addEventListener("lostpointercapture", () => {
+  draggingHandle = null;
+  draggingPointerId = null;
+});
 el.cropOverlay.addEventListener("focusin", (event) => {
   const handle = event.target.closest(".handle");
   if (handle) setActiveCropHandle(Number(handle.dataset.index));
@@ -1594,6 +1650,7 @@ function applyCropChanges() {
   );
   card.frameCandidateIndex = state.cropCandidateIndex;
   card.faceHint = suggestCardSide(out);
+  invalidatePdfCache();
   state.cropOpenSnapshot = { points: clonePoints(normalizedCrop), rotation: state.cropRotation };
   state.cropDirty = false;
   return card;
@@ -1828,12 +1885,20 @@ function printCell(card) {
   return cell;
 }
 
-async function generatePdf() {
+function pdfFilename(date = new Date()) {
+  const stamp = [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map((value) => String(value).padStart(2, "0"))
+    .join("");
+  return `證件影本_${stamp}.pdf`;
+}
+
+function buildPdfBundle() {
   const rows = rowsForPrint();
   if (!rows.length) {
     renderA4Preview();
-    return;
+    return null;
   }
+  renderA4Preview();
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const marginX = 12;
@@ -1847,7 +1912,96 @@ async function generatePdf() {
     if (row.front) pdf.addImage(row.front.currentDataUrl, "JPEG", marginX, y, CARD_W_MM, CARD_H_MM);
     if (row.back) pdf.addImage(row.back.currentDataUrl, "JPEG", marginX + CARD_W_MM + gapX, y, CARD_W_MM, CARD_H_MM);
   });
-  pdf.save("證件排版.pdf");
+  const outputBlob = pdf.output("blob");
+  const blob = outputBlob.type === "application/pdf"
+    ? outputBlob
+    : new Blob([outputBlob], { type: "application/pdf" });
+  const filename = pdfFilename();
+  const file = typeof File === "function"
+    ? new File([blob], filename, { type: "application/pdf" })
+    : null;
+  state.pdfCache = { blob, file, filename, objectUrl: null };
+  updatePdfActions();
+  return state.pdfCache;
+}
+
+function getPdfBundle() {
+  return state.pdfCache || buildPdfBundle();
+}
+
+function pdfObjectUrl(bundle) {
+  if (!bundle.objectUrl) bundle.objectUrl = URL.createObjectURL(bundle.blob);
+  return bundle.objectUrl;
+}
+
+function openPdfPreview(bundle) {
+  const url = pdfObjectUrl(bundle);
+  const opened = window.open(url, "_blank");
+  if (opened) {
+    try { opened.opener = null; } catch (_) { /* Cross-window restrictions are harmless here. */ }
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function downloadPdf(bundle) {
+  const link = document.createElement("a");
+  link.href = pdfObjectUrl(bundle);
+  link.download = bundle.filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function generatePdf() {
+  const bundle = getPdfBundle();
+  if (!bundle) return;
+  if (isMobilePdfEnvironment()) {
+    openPdfPreview(bundle);
+    log("PDF 已開啟，可使用瀏覽器分享或儲存到檔案");
+    return;
+  }
+  downloadPdf(bundle);
+  log(`已產生 ${bundle.filename}`);
+}
+
+async function sharePdf() {
+  const bundle = getPdfBundle();
+  if (!bundle) return;
+  const shareData = bundle.file ? { files: [bundle.file] } : null;
+  let canShareFiles = false;
+  try {
+    canShareFiles = Boolean(
+      shareData
+      && navigator.share
+      && navigator.canShare
+      && navigator.canShare(shareData)
+    );
+  } catch (_) {
+    canShareFiles = false;
+  }
+  if (!canShareFiles) {
+    openPdfPreview(bundle);
+    log("此瀏覽器不支援直接分享檔案，已開啟 PDF，請使用瀏覽器分享或儲存到檔案");
+    return;
+  }
+  try {
+    await navigator.share({
+      files: [bundle.file],
+      title: "證件影本"
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    console.warn("PDF share failed; opening preview instead.", error);
+    openPdfPreview(bundle);
+    log("分享功能未完成，已改為開啟 PDF 預覽");
+  }
 }
 
 addDefaultCase();

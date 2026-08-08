@@ -6,7 +6,7 @@
   <title>證件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260808-1">
+  <link rel="stylesheet" href="./tool.css?v=20260808-2">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -50,6 +50,7 @@
         <div class="actions">
           <button id="previewBtn" class="secondary" type="button">產生 A4 預覽</button>
           <button id="pdfBtn" class="primary" type="button">產生 PDF</button>
+          <button id="sharePdfBtn" class="secondary" type="button">分享 PDF</button>
         </div>
       </div>
       <div id="a4Preview" class="a4-preview empty">
@@ -86,7 +87,10 @@
             <canvas id="cropCanvas" tabindex="0" aria-label="裁切影像"></canvas>
             <svg id="cropOverlay"></svg>
           </div>
-          <p id="cropHandleHint" class="crop-handle-hint">使用方向鍵微調，Shift＋方向鍵快速移動</p>
+          <p id="cropHandleHint" class="crop-handle-hint">
+            <span class="keyboard-crop-hint">使用方向鍵微調，Shift＋方向鍵快速移動</span>
+            <span class="touch-crop-hint">拖曳四角調整裁切範圍</span>
+          </p>
         </div>
         <div class="crop-preview">
           <h3>校正預覽</h3>
@@ -153,6 +157,6 @@
     </form>
   </dialog>
 
-  <script src="./app.js"></script>
+  <script src="./app.js?v=20260808-2"></script>
 </body>
 </html>
