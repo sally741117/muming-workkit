@@ -304,6 +304,7 @@ function diagnosticSnapshot() {
       webSharePolicyAllowed: webSharePolicyAllowed(),
       inAppBrowser: inApp?.id || false,
       isLineInAppBrowser: inApp?.id === "line",
+      isSamsungInternet: isSamsungInternet(),
       isAndroid: /Android/i.test(navigator.userAgent),
       isIOS: /iPad|iPhone|iPod/i.test(navigator.userAgent)
         || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
@@ -653,11 +654,21 @@ function isMobilePdfEnvironment() {
     || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 }
 
+function isSamsungInternet(userAgent = navigator.userAgent) {
+  return /SamsungBrowser\//i.test(userAgent || "");
+}
+
+function shouldShowPdfShareAction(options = {}) {
+  const userAgent = options.userAgent ?? navigator.userAgent;
+  const shareAvailable = options.shareAvailable ?? (typeof navigator.share === "function");
+  const canShareAvailable = options.canShareAvailable ?? (typeof navigator.canShare === "function");
+  // Samsung Internet 30 reports PDF sharing support but rejects PDF Files with NotAllowedError.
+  return !isSamsungInternet(userAgent) && shareAvailable && canShareAvailable;
+}
+
 function updatePdfActions() {
   el.cases.querySelectorAll('[data-action="pdf-case"]').forEach((button) => {
-    button.textContent = state.pdfCache.has(button.dataset.caseId)
-      ? (isMobilePdfEnvironment() ? "開啟 PDF" : "下載 PDF")
-      : "產生 PDF";
+    button.textContent = isSamsungInternet() ? "下載 PDF" : "產生 PDF";
   });
 }
 
@@ -806,7 +817,9 @@ function renderCases() {
         <div class="case-head-actions">
           <button type="button" class="secondary" data-action="preview-case" data-case-id="${item.id}">預覽此案件</button>
           <button type="button" class="primary" data-action="pdf-case" data-case-id="${item.id}">產生 PDF</button>
-          <button type="button" data-action="share-pdf-case" data-case-id="${item.id}">分享 PDF</button>
+          ${shouldShowPdfShareAction()
+            ? `<button type="button" data-action="share-pdf-case" data-case-id="${item.id}">分享 PDF</button>`
+            : ""}
           ${caseIndex > 0 ? '<button type="button" data-action="delete-case">刪除案件</button>' : ""}
         </div>
       </div>
@@ -2698,6 +2711,11 @@ function downloadPdf(bundle) {
 function generatePdf(caseId) {
   const bundle = getPdfBundle(caseId);
   if (!bundle) return;
+  if (isSamsungInternet()) {
+    downloadPdf(bundle);
+    log(`已下載 ${bundle.filename}`);
+    return;
+  }
   if (isMobilePdfEnvironment()) {
     openPdfPreview(bundle);
     log("PDF 已開啟，可使用瀏覽器分享或儲存到檔案");
@@ -2709,6 +2727,10 @@ function generatePdf(caseId) {
 
 async function sharePdf(caseId, button) {
   if (button?.disabled) return;
+  if (isSamsungInternet()) {
+    generatePdf(caseId);
+    return;
+  }
   const shareStartedAt = performance.now();
   if (diagnosticEnabled) {
     const activation = userActivationSnapshot();
