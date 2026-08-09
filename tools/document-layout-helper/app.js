@@ -2188,25 +2188,17 @@ function drawCropOverlay() {
 let draggingHandle = null;
 let draggingPointerId = null;
 let draggingCaptureTarget = null;
+let draggingTouchId = null;
+let activeCropInputMode = null;
 let cropDragStart = null;
 let cropDragMoved = false;
 let suppressCropClickUntil = 0;
 const cropHandleLabels = ["左上角", "右上角", "右下角", "左下角"];
 
-function preventCropDragScroll(event) {
-  if (draggingHandle === null) return;
-  event.preventDefault();
-}
-
 function setCropDragging(active) {
   el.cropDialog.classList.toggle("crop-dragging", active);
   el.cropCanvas.parentElement.classList.toggle("crop-dragging", active);
   document.body.classList.toggle("crop-handle-dragging", active);
-  if (active) {
-    document.addEventListener("touchmove", preventCropDragScroll, { passive: false, capture: true });
-  } else {
-    document.removeEventListener("touchmove", preventCropDragScroll, true);
-  }
 }
 
 function clearCropPointerDrag(pointerId = draggingPointerId) {
@@ -2214,6 +2206,8 @@ function clearCropPointerDrag(pointerId = draggingPointerId) {
   draggingHandle = null;
   draggingPointerId = null;
   draggingCaptureTarget = null;
+  draggingTouchId = null;
+  activeCropInputMode = null;
   cropDragStart = null;
   setCropDragging(false);
   if (captureTarget && pointerId !== null) {
@@ -2263,10 +2257,36 @@ function moveActiveCropHandle(key, fast = false) {
   updateCorrectedPreview();
 }
 
+function updateDraggedCropPoint(clientX, clientY) {
+  if (draggingHandle === null) return;
+  if (cropDragStart && Math.hypot(clientX - cropDragStart.x, clientY - cropDragStart.y) > 4) {
+    cropDragMoved = true;
+  }
+  const rect = el.cropCanvas.getBoundingClientRect();
+  state.cropPoints[draggingHandle] = imagePoint({ x: clientX - rect.left, y: clientY - rect.top });
+  state.cropDirty = true;
+  state.cropManuallyAdjusted = true;
+  drawCropOverlay();
+  updateCorrectedPreview();
+}
+
+function blockCropSurfaceTouch(event) {
+  if (event.cancelable) event.preventDefault();
+  event.stopPropagation();
+}
+
+[el.cropCanvas, el.cropCanvas.parentElement].forEach((surface) => {
+  surface.addEventListener("touchstart", blockCropSurfaceTouch, { passive: false });
+  surface.addEventListener("touchmove", blockCropSurfaceTouch, { passive: false });
+});
+
 el.cropOverlay.addEventListener("pointerdown", (event) => {
   const handle = event.target.closest?.(".handle");
   if (!handle) return;
   if (event.cancelable) event.preventDefault();
+  event.stopPropagation();
+  if (activeCropInputMode === "touch" || draggingHandle !== null) return;
+  activeCropInputMode = "pointer";
   draggingHandle = Number(handle.dataset.index);
   draggingPointerId = event.pointerId;
   draggingCaptureTarget = handle;
@@ -2279,23 +2299,17 @@ el.cropOverlay.addEventListener("pointerdown", (event) => {
   } catch (_) {
     // Synthetic events may not represent an active pointer; real input still uses capture.
   }
-});
+}, { passive: false });
 el.cropOverlay.addEventListener("pointermove", (event) => {
-  if (draggingHandle === null || event.pointerId !== draggingPointerId) return;
+  if (activeCropInputMode !== "pointer" || draggingHandle === null || event.pointerId !== draggingPointerId) return;
   if (event.cancelable) event.preventDefault();
-  if (cropDragStart && Math.hypot(event.clientX - cropDragStart.x, event.clientY - cropDragStart.y) > 4) {
-    cropDragMoved = true;
-  }
-  const rect = el.cropCanvas.getBoundingClientRect();
-  state.cropPoints[draggingHandle] = imagePoint({ x: event.clientX - rect.left, y: event.clientY - rect.top });
-  state.cropDirty = true;
-  state.cropManuallyAdjusted = true;
-  drawCropOverlay();
-  updateCorrectedPreview();
-});
+  event.stopPropagation();
+  updateDraggedCropPoint(event.clientX, event.clientY);
+}, { passive: false });
 function endCropPointer(event) {
-  if (draggingPointerId === null || event.pointerId !== draggingPointerId) return;
+  if (activeCropInputMode !== "pointer" || draggingPointerId === null || event.pointerId !== draggingPointerId) return;
   if (event.cancelable) event.preventDefault();
+  event.stopPropagation();
   if (cropDragMoved) suppressCropClickUntil = performance.now() + 500;
   clearCropPointerDrag(event.pointerId);
 }
@@ -2303,8 +2317,40 @@ function endCropPointer(event) {
 el.cropOverlay.addEventListener("pointerup", endCropPointer);
 el.cropOverlay.addEventListener("pointercancel", endCropPointer);
 el.cropOverlay.addEventListener("lostpointercapture", () => {
-  if (draggingHandle !== null) clearCropPointerDrag();
+  if (activeCropInputMode === "pointer" && draggingHandle !== null) clearCropPointerDrag();
 });
+el.cropOverlay.addEventListener("touchstart", (event) => {
+  blockCropSurfaceTouch(event);
+  const handle = event.target.closest?.(".handle");
+  if (!handle || activeCropInputMode === "pointer" || draggingHandle !== null) return;
+  const touch = event.changedTouches[0];
+  if (!touch) return;
+  activeCropInputMode = "touch";
+  draggingHandle = Number(handle.dataset.index);
+  draggingTouchId = touch.identifier;
+  cropDragStart = { x: touch.clientX, y: touch.clientY };
+  cropDragMoved = false;
+  setActiveCropHandle(draggingHandle);
+  setCropDragging(true);
+}, { passive: false });
+el.cropOverlay.addEventListener("touchmove", (event) => {
+  blockCropSurfaceTouch(event);
+  if (activeCropInputMode !== "touch" || draggingHandle === null) return;
+  const touch = Array.from(event.touches).find((item) => item.identifier === draggingTouchId);
+  if (!touch) return;
+  updateDraggedCropPoint(touch.clientX, touch.clientY);
+}, { passive: false });
+function endCropTouch(event) {
+  blockCropSurfaceTouch(event);
+  if (activeCropInputMode !== "touch" || draggingHandle === null) return;
+  const ended = event.type === "touchcancel"
+    || Array.from(event.changedTouches).some((touch) => touch.identifier === draggingTouchId);
+  if (!ended) return;
+  if (cropDragMoved) suppressCropClickUntil = performance.now() + 500;
+  clearCropPointerDrag(null);
+}
+el.cropOverlay.addEventListener("touchend", endCropTouch, { passive: false });
+el.cropOverlay.addEventListener("touchcancel", endCropTouch, { passive: false });
 el.cropOverlay.addEventListener("click", (event) => {
   if (performance.now() > suppressCropClickUntil) return;
   event.preventDefault();
