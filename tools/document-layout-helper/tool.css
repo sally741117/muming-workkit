@@ -184,17 +184,38 @@ button:disabled { opacity: .55; cursor: wait; }
 
 .status-log:empty { display: none; }
 
-.in-app-browser-notice {
-  margin-bottom: 12px;
-  padding: 9px 11px;
-  border: 1px solid #e1c27d;
-  border-radius: 6px;
-  background: #fff8e8;
-  color: #73531a;
-  font-size: 13px;
+.diagnostic-panel {
+  margin-bottom: 14px;
+  border-color: #b7d3ce;
+  box-shadow: none;
 }
 
-.in-app-browser-notice[hidden] { display: none; }
+.diagnostic-panel[hidden] { display: none; }
+.diagnostic-panel .panel-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.diagnostic-output {
+  max-height: 360px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: #f7faf9;
+  color: #31413f;
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diagnostic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
 
 .card-list {
   display: grid;
@@ -330,6 +351,7 @@ button:disabled { opacity: .55; cursor: wait; }
 
 .slot-label { margin-bottom: 3px; color: var(--muted); font-size: 12px; }
 .slot-empty { color: var(--muted); font-size: 12px; }
+.mobile-slot-actions { display: none; }
 .slot:has(.card) { min-height: 112px; cursor: default; }
 .slot:has(.card) .slot-empty { display: none; }
 .slot .card { padding: 6px; box-shadow: none; }
@@ -444,10 +466,6 @@ dialog {
 }
 
 dialog::backdrop { background: rgba(20, 28, 28, .55); }
-
-.in-app-browser-dialog { width: min(520px, calc(100vw - 24px)); }
-.in-app-browser-dialog p { margin-bottom: 0; color: var(--muted); line-height: 1.7; }
-.in-app-browser-actions { flex-wrap: wrap; }
 
 .crop-dialog {
   max-height: calc(100vh - 28px);
@@ -629,6 +647,7 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
     max-width: 100%;
     height: auto;
   }
+  .diagnostic-actions button { flex: 1 1 150px; }
   .crop-dialog > .dialog-shell > .dialog-actions {
     position: sticky;
     z-index: 4;
@@ -639,6 +658,28 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
     background: rgba(255, 255, 255, .98);
   }
   .page { transform-origin: top center; zoom: .72; }
+}
+
+@media (max-width: 920px), (pointer: coarse) {
+  .desktop-slot-prompt { display: none; }
+  .mobile-slot-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .mobile-slot-actions button {
+    min-width: 0;
+    min-height: 34px;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+  .mobile-slot-actions .slot-pdf-button {
+    grid-column: 1 / -1;
+    min-height: 26px;
+    border-color: transparent;
+    background: transparent;
+    color: var(--accent);
+  }
 }
 
 @media (pointer: coarse) {

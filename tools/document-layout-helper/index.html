@@ -6,7 +6,7 @@
   <title>證件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260808-6">
+  <link rel="stylesheet" href="./tool.css?v=20260809-1">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -30,6 +30,23 @@
       <span>6 PDF</span>
     </section>
 
+    <section id="diagnosticPanel" class="panel diagnostic-panel" aria-labelledby="diagnosticTitle" hidden>
+      <div class="panel-head">
+        <div>
+          <h2 id="diagnosticTitle">Android 能力診斷</h2>
+          <p>只記錄瀏覽器能力與錯誤，不包含證件或 PDF 內容。</p>
+        </div>
+        <button id="refreshDiagnosticBtn" type="button">重新檢測</button>
+      </div>
+      <pre id="diagnosticOutput" class="diagnostic-output" aria-live="polite"></pre>
+      <div class="diagnostic-actions">
+        <button id="testPdfShareBtn" class="primary" type="button">測試 PDF 分享</button>
+        <button id="testBlobDownloadBtn" type="button">測試 Blob 下載</button>
+        <button id="testBlobOpenBtn" type="button">測試開啟 Blob PDF</button>
+        <button id="copyDiagnosticBtn" type="button">複製診斷結果</button>
+      </div>
+    </section>
+
     <section class="workspace">
       <section class="panel cases-panel">
         <div class="panel-head">
@@ -39,7 +56,6 @@
           </div>
           <button id="addCaseBtn" class="ghost" type="button">＋新增下一組案件</button>
         </div>
-        <div id="inAppBrowserNotice" class="in-app-browser-notice" role="status" hidden></div>
         <div id="statusLog" class="status-log" aria-live="polite"></div>
         <div id="cases"></div>
       </section>
@@ -58,21 +74,6 @@
   <footer class="site-footer">
     <a href="../../index.html">© 2026 MUMING 牧茗製作</a>
   </footer>
-
-  <dialog id="inAppBrowserDialog" class="in-app-browser-dialog">
-    <form method="dialog" class="dialog-shell">
-      <div class="dialog-head">
-        <h2>請使用瀏覽器開啟</h2>
-        <button class="icon" value="cancel" aria-label="關閉" type="submit">×</button>
-      </div>
-      <p id="inAppBrowserMessage"></p>
-      <div class="dialog-actions in-app-browser-actions">
-        <button id="copyCurrentUrlBtn" class="primary" type="button">複製目前網址</button>
-        <button id="openExternalBrowserBtn" type="button">嘗試用外部瀏覽器開啟</button>
-        <button value="cancel" type="submit">關閉</button>
-      </div>
-    </form>
-  </dialog>
 
   <dialog id="cropDialog" class="crop-dialog">
     <form method="dialog" class="dialog-shell">
@@ -168,6 +169,11 @@
     </form>
   </dialog>
 
-  <script src="./app.js?v=20260808-15"></script>
+  <input id="slotGalleryInput" type="file" accept="image/jpeg,image/png,image/webp,image/*" hidden>
+  <input id="slotCameraInput" type="file" accept="image/*" capture="environment" hidden>
+  <input id="slotPdfInput" type="file" accept="application/pdf,.pdf" hidden>
+  <input id="slotMixedInput" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" hidden>
+
+  <script src="./app.js?v=20260809-1"></script>
 </body>
 </html>

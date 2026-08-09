@@ -25,22 +25,29 @@ const state = {
   selectedCardId: null,
   slotChoice: null,
   replaceRequest: null,
-  fileChooserCallback: null,
+  fileChooserCallbacks: {},
   pointerDrag: null,
   cvReady: false,
   pdfReady: false,
   activePreviewCaseId: null,
-  pdfCache: new Map()
+  pdfCache: new Map(),
+  pdfWarmTimers: new Map()
 };
 
 const el = {
   engineStatus: document.querySelector("#engineStatus"),
   statusLog: document.querySelector("#statusLog"),
-  inAppBrowserNotice: document.querySelector("#inAppBrowserNotice"),
-  inAppBrowserDialog: document.querySelector("#inAppBrowserDialog"),
-  inAppBrowserMessage: document.querySelector("#inAppBrowserMessage"),
-  copyCurrentUrlBtn: document.querySelector("#copyCurrentUrlBtn"),
-  openExternalBrowserBtn: document.querySelector("#openExternalBrowserBtn"),
+  diagnosticPanel: document.querySelector("#diagnosticPanel"),
+  diagnosticOutput: document.querySelector("#diagnosticOutput"),
+  refreshDiagnosticBtn: document.querySelector("#refreshDiagnosticBtn"),
+  testPdfShareBtn: document.querySelector("#testPdfShareBtn"),
+  testBlobDownloadBtn: document.querySelector("#testBlobDownloadBtn"),
+  testBlobOpenBtn: document.querySelector("#testBlobOpenBtn"),
+  copyDiagnosticBtn: document.querySelector("#copyDiagnosticBtn"),
+  slotGalleryInput: document.querySelector("#slotGalleryInput"),
+  slotCameraInput: document.querySelector("#slotCameraInput"),
+  slotPdfInput: document.querySelector("#slotPdfInput"),
+  slotMixedInput: document.querySelector("#slotMixedInput"),
   cases: document.querySelector("#cases"),
   addCaseBtn: document.querySelector("#addCaseBtn"),
   previewTitle: document.querySelector("#previewTitle"),
@@ -111,18 +118,6 @@ function inAppBrowserInfo(userAgent = window.navigator.userAgent) {
   return null;
 }
 
-function isInAppBrowser(userAgent = window.navigator.userAgent) {
-  return Boolean(inAppBrowserInfo(userAgent));
-}
-
-function showInAppBrowserDialog(info = inAppBrowserInfo()) {
-  if (!info) return false;
-  el.inAppBrowserMessage.textContent = `目前使用的是 ${info.name} 內建瀏覽器，無法直接分享或下載 PDF。請改用 Chrome 或 Safari 開啟本工具。`;
-  if (!el.inAppBrowserDialog.open) el.inAppBrowserDialog.showModal();
-  requestAnimationFrame(() => el.copyCurrentUrlBtn.focus());
-  return true;
-}
-
 async function copyText(text) {
   try {
     if (window.navigator.clipboard?.writeText) {
@@ -150,40 +145,217 @@ async function copyText(text) {
   return copied;
 }
 
-async function copyCurrentUrl({ announce = true } = {}) {
-  const copied = await copyText(window.location.href);
-  if (announce) {
-    showToast(copied
-      ? "網址已複製，請貼到 Chrome 或 Safari 開啟。"
-      : "無法自動複製，請使用右上角選單以瀏覽器開啟。");
+
+const diagnosticEnabled = new URLSearchParams(window.location.search).get("debug") === "1";
+const diagnosticState = {
+  inputs: {
+    gallery: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 },
+    camera: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 },
+    pdf: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 }
+  },
+  pdf: {
+    blobCreated: false,
+    blobType: "",
+    blobSize: 0,
+    fileCreated: false,
+    fileName: "",
+    fileType: "",
+    fileSize: 0,
+    canShareFiles: null,
+    canShareFilesErrorName: "",
+    canShareFilesErrorMessage: "",
+    canShareUrl: null,
+    canShareUrlErrorName: "",
+    canShareUrlErrorMessage: "",
+    shareResult: "not-tested",
+    shareErrorName: "",
+    shareErrorMessage: "",
+    blobDownload: "not-tested",
+    blobOpen: "not-tested"
   }
-  return copied;
+};
+
+function createDiagnosticPdfBundle() {
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  pdf.setFontSize(18);
+  pdf.text("MUMING PDF Share Test", 20, 30);
+  const outputBlob = pdf.output("blob");
+  const blob = outputBlob.type === "application/pdf"
+    ? outputBlob
+    : new Blob([outputBlob], { type: "application/pdf" });
+  const file = typeof File === "function"
+    ? new File([blob], "muming-share-test.pdf", { type: "application/pdf" })
+    : null;
+  return { blob, file };
 }
 
-async function tryOpenExternalBrowser() {
-  const opened = window.open(window.location.href, "_blank");
-  const copied = await copyCurrentUrl({ announce: false });
-  if (opened) {
-    try { opened.opener = null; } catch (_) { /* Cross-window restrictions are harmless here. */ }
-    showToast(copied
-      ? "已嘗試開啟；若仍在內建瀏覽器，網址也已複製。"
-      : "若仍在內建瀏覽器，請使用右上角選單以預設瀏覽器開啟。");
-    return;
+function diagnosticSnapshot() {
+  const inApp = inAppBrowserInfo();
+  return {
+    browser: {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform || "",
+      secureContext: window.isSecureContext,
+      navigatorShare: typeof navigator.share === "function",
+      navigatorCanShare: typeof navigator.canShare === "function",
+      inAppBrowser: inApp?.id || false,
+      isLineInAppBrowser: inApp?.id === "line",
+      isAndroid: /Android/i.test(navigator.userAgent),
+      isIOS: /iPad|iPhone|iPod/i.test(navigator.userAgent)
+        || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+    },
+    pdf: { ...diagnosticState.pdf },
+    fileInputs: {
+      gallery: { ...diagnosticState.inputs.gallery },
+      camera: { ...diagnosticState.inputs.camera },
+      pdf: { ...diagnosticState.inputs.pdf }
+    }
+  };
+}
+
+function renderDiagnostic() {
+  if (!diagnosticEnabled) return;
+  el.diagnosticOutput.textContent = JSON.stringify(diagnosticSnapshot(), null, 2);
+}
+
+function refreshDiagnosticCapabilities(bundle = null) {
+  if (!diagnosticEnabled) return;
+  try {
+    const { blob, file } = bundle || createDiagnosticPdfBundle();
+    diagnosticState.pdf.blobCreated = blob instanceof Blob;
+    diagnosticState.pdf.blobType = blob.type;
+    diagnosticState.pdf.blobSize = blob.size;
+    diagnosticState.pdf.fileCreated = file instanceof File;
+    diagnosticState.pdf.fileName = file?.name || "";
+    diagnosticState.pdf.fileType = file?.type || "";
+    diagnosticState.pdf.fileSize = file?.size || 0;
+    diagnosticState.pdf.canShareFiles = false;
+    diagnosticState.pdf.canShareFilesErrorName = "";
+    diagnosticState.pdf.canShareFilesErrorMessage = "";
+    if (typeof navigator.canShare === "function" && file) {
+      try {
+        diagnosticState.pdf.canShareFiles = Boolean(navigator.canShare({ files: [file] }));
+      } catch (error) {
+        diagnosticState.pdf.canShareFilesErrorName = error?.name || "Error";
+        diagnosticState.pdf.canShareFilesErrorMessage = error?.message || String(error);
+      }
+    }
+    diagnosticState.pdf.canShareUrl = false;
+    diagnosticState.pdf.canShareUrlErrorName = "";
+    diagnosticState.pdf.canShareUrlErrorMessage = "";
+    if (typeof navigator.canShare === "function") {
+      try {
+        diagnosticState.pdf.canShareUrl = Boolean(navigator.canShare({
+          title: "MUMING",
+          text: "PDF Share Test",
+          url: window.location.href
+        }));
+      } catch (error) {
+        diagnosticState.pdf.canShareUrlErrorName = error?.name || "Error";
+        diagnosticState.pdf.canShareUrlErrorMessage = error?.message || String(error);
+      }
+    }
+  } catch (error) {
+    diagnosticState.pdf.shareResult = "capability-check-error";
+    diagnosticState.pdf.shareErrorName = error?.name || "Error";
+    diagnosticState.pdf.shareErrorMessage = error?.message || String(error);
   }
-  showToast(copied
-    ? "無法自動開啟，網址已複製；請貼到 Chrome 或 Safari。"
-    : "請使用右上角選單選擇以預設瀏覽器開啟。");
+  renderDiagnostic();
 }
 
-function initInAppBrowserUx() {
-  const info = inAppBrowserInfo();
-  if (!info) return;
-  el.inAppBrowserNotice.hidden = false;
-  el.inAppBrowserNotice.textContent = `目前使用 ${info.name} 內建瀏覽器，PDF 分享請改用 Chrome／Safari。`;
+async function testDiagnosticPdfShare() {
+  if (el.testPdfShareBtn.disabled) return;
+  el.testPdfShareBtn.disabled = true;
+  const originalLabel = el.testPdfShareBtn.textContent;
+  el.testPdfShareBtn.textContent = "測試中…";
+  try {
+    const bundle = createDiagnosticPdfBundle();
+    const { file } = bundle;
+    refreshDiagnosticCapabilities(bundle);
+    if (typeof navigator.share !== "function") {
+      diagnosticState.pdf.shareResult = "navigator.share-missing";
+      return;
+    }
+    if (!file || typeof navigator.canShare !== "function" || !navigator.canShare({ files: [file] })) {
+      diagnosticState.pdf.shareResult = "file-share-not-supported";
+      return;
+    }
+    await navigator.share({ files: [file], title: "MUMING PDF Share Test" });
+    diagnosticState.pdf.shareResult = "share-sheet-completed";
+    diagnosticState.pdf.shareErrorName = "";
+    diagnosticState.pdf.shareErrorMessage = "";
+  } catch (error) {
+    diagnosticState.pdf.shareResult = error?.name === "AbortError" ? "user-cancelled" : "share-error";
+    diagnosticState.pdf.shareErrorName = error?.name || "Error";
+    diagnosticState.pdf.shareErrorMessage = error?.message || String(error);
+  } finally {
+    el.testPdfShareBtn.disabled = false;
+    el.testPdfShareBtn.textContent = originalLabel;
+    renderDiagnostic();
+  }
 }
 
-el.copyCurrentUrlBtn.addEventListener("click", () => void copyCurrentUrl());
-el.openExternalBrowserBtn.addEventListener("click", () => void tryOpenExternalBrowser());
+function testDiagnosticBlobDownload() {
+  try {
+    const { blob } = createDiagnosticPdfBundle();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "muming-share-test.pdf";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    diagnosticState.pdf.blobDownload = "download-triggered";
+  } catch (error) {
+    diagnosticState.pdf.blobDownload = `error:${error?.name || "Error"}`;
+  }
+  renderDiagnostic();
+}
+
+function testDiagnosticBlobOpen() {
+  try {
+    const { blob } = createDiagnosticPdfBundle();
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, "_blank");
+    diagnosticState.pdf.blobOpen = opened ? "window-opened" : "popup-blocked";
+    if (opened) {
+      try { opened.opener = null; } catch (_) { /* Cross-window restrictions are harmless here. */ }
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (error) {
+    diagnosticState.pdf.blobOpen = `error:${error?.name || "Error"}`;
+  }
+  renderDiagnostic();
+}
+
+function recordDiagnosticInput(kind, files) {
+  if (!diagnosticEnabled || !diagnosticState.inputs[kind]) return;
+  const file = files[0];
+  diagnosticState.inputs[kind] = {
+    pickerRequested: true,
+    changeEvent: true,
+    fileReceived: Boolean(file),
+    type: file?.type || "",
+    size: file?.size || 0
+  };
+  renderDiagnostic();
+}
+
+function initDiagnostics() {
+  if (!diagnosticEnabled) return;
+  el.diagnosticPanel.hidden = false;
+  refreshDiagnosticCapabilities();
+  el.refreshDiagnosticBtn.addEventListener("click", () => refreshDiagnosticCapabilities());
+  el.testPdfShareBtn.addEventListener("click", () => void testDiagnosticPdfShare());
+  el.testBlobDownloadBtn.addEventListener("click", testDiagnosticBlobDownload);
+  el.testBlobOpenBtn.addEventListener("click", testDiagnosticBlobOpen);
+  el.copyDiagnosticBtn.addEventListener("click", async () => {
+    const copied = await copyText(el.diagnosticOutput.textContent);
+    showToast(copied ? "診斷結果已複製。" : "無法自動複製診斷結果。");
+  });
+}
 
 function isMobilePdfEnvironment() {
   return window.matchMedia?.("(pointer: coarse)").matches
@@ -363,6 +535,7 @@ function renderCases() {
     el.cases.appendChild(box);
   });
   updatePdfActions();
+  state.cases.forEach((item) => schedulePdfCacheWarm(item.id));
 }
 
 function personNode(caseId, person) {
@@ -374,8 +547,14 @@ function personNode(caseId, person) {
       ${person.fixed ? "" : '<button type="button" data-action="delete-person">刪除</button>'}
     </div>
     <div class="slots">
-      <div class="slot" data-case-id="${caseId}" data-person-id="${person.id}" data-side="front"><div class="slot-label">正面</div><div class="slot-empty">拖入或選擇檔案</div></div>
-      <div class="slot" data-case-id="${caseId}" data-person-id="${person.id}" data-side="back"><div class="slot-label">反面</div><div class="slot-empty">拖入或選擇檔案</div></div>
+      <div class="slot" data-case-id="${caseId}" data-person-id="${person.id}" data-side="front">
+        <div class="slot-label">正面</div>
+        ${slotEmptyMarkup()}
+      </div>
+      <div class="slot" data-case-id="${caseId}" data-person-id="${person.id}" data-side="back">
+        <div class="slot-label">反面</div>
+        ${slotEmptyMarkup()}
+      </div>
     </div>`;
   wrap.querySelectorAll(".slot").forEach((slot) => wireSlot(slot));
   if (!person.fixed) {
@@ -392,9 +571,26 @@ function personNode(caseId, person) {
   return wrap;
 }
 
+function slotEmptyMarkup() {
+  return `<div class="slot-empty">
+    <span class="desktop-slot-prompt">拖入或選擇檔案</span>
+    <div class="mobile-slot-actions" aria-label="加入證件">
+      <button type="button" data-file-kind="gallery">從相簿選擇</button>
+      <button type="button" data-file-kind="camera">直接拍照</button>
+      <button type="button" class="slot-pdf-button" data-file-kind="pdf">選擇 PDF</button>
+    </div>
+  </div>`;
+}
+
 function wireSlot(slot) {
   slot.addEventListener("click", (event) => {
     if (event.target.closest(".card")) return;
+    const picker = event.target.closest("[data-file-kind]");
+    if (picker) {
+      event.stopPropagation();
+      chooseFilesForSlot(slot, picker.dataset.fileKind);
+      return;
+    }
     if (!state.selectedCardId) {
       if (slot.querySelector(".card")) return;
       chooseFilesForSlot(slot);
@@ -421,33 +617,46 @@ function wireSlot(slot) {
 }
 
 function isSupportedFile(file) {
-  return /image\/(jpeg|png)|application\/pdf/.test(file.type) || /\.(jpe?g|png|pdf)$/i.test(file.name);
+  return /^image\//.test(file.type) || file.type === "application/pdf" || /\.(jpe?g|png|webp|pdf)$/i.test(file.name);
 }
 
-function chooseFiles(callback) {
-  let input = document.querySelector("#directFileInput");
-  if (!input) {
-    input = document.createElement("input");
-    input.id = "directFileInput";
-    input.type = "file";
-    input.accept = ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf";
-    input.multiple = true;
-    input.hidden = true;
+function chooseFiles(callback, kind = "mixed") {
+  const inputs = {
+    gallery: el.slotGalleryInput,
+    camera: el.slotCameraInput,
+    pdf: el.slotPdfInput,
+    mixed: el.slotMixedInput
+  };
+  const input = inputs[kind] || inputs.mixed;
+  if (!input.dataset.wired) {
+    input.dataset.wired = "true";
     input.addEventListener("change", () => {
-      const files = [...input.files].filter(isSupportedFile);
+      const rawFiles = [...input.files];
+      const files = rawFiles.filter(isSupportedFile);
+      if (kind !== "mixed") recordDiagnosticInput(kind, rawFiles);
       input.value = "";
-      const handler = state.fileChooserCallback;
-      state.fileChooserCallback = null;
+      const handler = state.fileChooserCallbacks[kind];
+      delete state.fileChooserCallbacks[kind];
       if (handler) handler(files);
     });
-    document.body.appendChild(input);
   }
-  state.fileChooserCallback = callback;
+  state.fileChooserCallbacks[kind] = callback;
+  if (kind !== "mixed" && diagnosticEnabled) {
+    diagnosticState.inputs[kind] = {
+      pickerRequested: true,
+      changeEvent: false,
+      fileReceived: false,
+      type: "",
+      size: 0
+    };
+    renderDiagnostic();
+  }
+  input.value = "";
   input.click();
 }
 
-function chooseFilesForSlot(slot) {
-  chooseFiles((files) => handleSlotFiles(files, slot));
+function chooseFilesForSlot(slot, kind = "mixed") {
+  chooseFiles((files) => handleSlotFiles(files, slot), kind);
 }
 
 async function handleSlotFiles(files, slot) {
@@ -2095,14 +2304,15 @@ function pdfFilename(caseItem) {
   return `${caseName}_證件影本.pdf`;
 }
 
-function buildPdfBundle(caseId) {
+function buildPdfBundle(caseId, options = {}) {
+  const renderPreview = options.renderPreview ?? true;
   const caseItem = state.cases.find((item) => item.id === caseId);
   const pages = buildCasePages(caseId);
   if (!caseItem || !pages.length) {
-    renderA4Preview(caseId);
+    if (renderPreview) renderA4Preview(caseId);
     return null;
   }
-  renderA4Preview(caseId);
+  if (renderPreview) renderA4Preview(caseId);
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const marginX = 12;
@@ -2136,6 +2346,24 @@ function getPdfBundle(caseId) {
   return state.pdfCache.get(caseId) || buildPdfBundle(caseId);
 }
 
+function schedulePdfCacheWarm(caseId) {
+  if (state.pdfCache.has(caseId) || state.pdfWarmTimers.has(caseId) || !rowsForCase(caseId).length) return;
+  const warm = () => {
+    state.pdfWarmTimers.delete(caseId);
+    if (!state.pdfCache.has(caseId) && rowsForCase(caseId).length) {
+      try {
+        buildPdfBundle(caseId, { renderPreview: false });
+      } catch (error) {
+        console.warn("PDF cache preparation failed.", error);
+      }
+    }
+  };
+  const timer = typeof window.requestIdleCallback === "function"
+    ? window.requestIdleCallback(warm, { timeout: 1200 })
+    : window.setTimeout(warm, 0);
+  state.pdfWarmTimers.set(caseId, timer);
+}
+
 function pdfObjectUrl(bundle) {
   if (!bundle.objectUrl) bundle.objectUrl = URL.createObjectURL(bundle.blob);
   return bundle.objectUrl;
@@ -2167,10 +2395,6 @@ function downloadPdf(bundle) {
 }
 
 function generatePdf(caseId) {
-  if (isInAppBrowser()) {
-    showInAppBrowserDialog();
-    return;
-  }
   const bundle = getPdfBundle(caseId);
   if (!bundle) return;
   if (isMobilePdfEnvironment()) {
@@ -2184,10 +2408,6 @@ function generatePdf(caseId) {
 
 async function sharePdf(caseId, button) {
   if (button?.disabled) return;
-  if (isInAppBrowser()) {
-    showInAppBrowserDialog();
-    return;
-  }
   const originalLabel = button?.textContent || "分享 PDF";
   if (button) {
     button.disabled = true;
@@ -2246,5 +2466,5 @@ async function sharePdf(caseId, button) {
 
 addDefaultCase();
 renderAll();
-initInAppBrowserUx();
+initDiagnostics();
 initEngines();
