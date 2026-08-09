@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="行政日期與年資計算器：試用期、契約、年資、文件期限，一次算清楚。">
+  <meta name="theme-color" content="#173C35">
+  <title>行政日期與年資計算器｜MUMING WorkKit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tool.css">
+</head>
+<body>
+  <a class="skip-link" href="#calculator">跳到計算器</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="../../index.html" aria-label="回到 MUMING WorkKit 首頁">
+        <img class="brand-logo" src="../../assets/image_1.png" alt="MUMING">
+        <span class="brand-copy">
+          <span class="brand-name">MUMING WorkKit</span>
+          <span class="brand-en">ADMINISTRATION TOOL</span>
+        </span>
+      </a>
+      <a class="header-link" href="../../index.html#free-tools">返回工具列表</a>
+    </div>
+  </header>
+
+  <main id="calculator" class="page-shell">
+    <section class="intro">
+      <div>
+        <p class="eyebrow">日期試算工具</p>
+        <h1>行政日期與年資計算器</h1>
+        <p class="subtitle">試用期、契約、年資、文件期限，一次算清楚。</p>
+        <p class="intro-note">不用翻日曆、不用自己數天數，輸入日期即可快速取得結果。</p>
+      </div>
+      <div class="privacy-card">
+        <strong>資料隱私</strong>
+        <span>資料僅於目前瀏覽器頁面進行計算，不登入、不上傳、不保存輸入內容。</span>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="計算功能">
+      <button type="button" class="tab is-active" data-tab="probation">試用期到期</button>
+      <button type="button" class="tab" data-tab="contract">契約期限</button>
+      <button type="button" class="tab" data-tab="seniority">年資計算</button>
+      <button type="button" class="tab" data-tab="document">文件到期</button>
+    </nav>
+
+    <section class="display-setting" aria-label="日期顯示設定">
+      <span class="setting-label">日期顯示</span>
+      <div class="segmented-control">
+        <label><input type="radio" name="dateDisplay" value="western"><span>西元</span></label>
+        <label><input type="radio" name="dateDisplay" value="roc"><span>民國</span></label>
+        <label><input type="radio" name="dateDisplay" value="both" checked><span>西元＋民國</span></label>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <form class="panel input-panel" id="toolForm" novalidate>
+        <div class="panel-heading">
+          <span class="panel-badge">1</span>
+          <div>
+            <h2>輸入資料</h2>
+            <p id="inputHint">輸入到職日期與試用期間，快速取得試用期到期日。</p>
+          </div>
+        </div>
+
+        <div class="form-section form-mode is-active" data-form="probation">
+          <div class="field">
+            <label for="probationStart">到職日期</label>
+            <input type="date" id="probationStart" data-date-input data-error="probationStartError">
+            <p class="date-helper" data-date-helper-for="probationStart"></p>
+            <p class="field-error" id="probationStartError"></p>
+          </div>
+
+          <fieldset class="field">
+            <legend>試用期間</legend>
+            <div class="quick-grid" data-quick-group="probation">
+              <label><input type="radio" name="probationPreset" value="0:1:0"><span>1 個月</span></label>
+              <label><input type="radio" name="probationPreset" value="0:2:0"><span>2 個月</span></label>
+              <label><input type="radio" name="probationPreset" value="0:3:0" checked><span>3 個月</span></label>
+              <label><input type="radio" name="probationPreset" value="0:6:0"><span>6 個月</span></label>
+              <label><input type="radio" name="probationPreset" value="custom"><span>自訂</span></label>
+            </div>
+            <div class="custom-period" id="probationCustom">
+              <label><input type="number" min="0" step="1" id="probationCustomYears" value="0"><span>年</span></label>
+              <label><input type="number" min="0" step="1" id="probationCustomMonths" value="0"><span>個月</span></label>
+              <label><input type="number" min="0" step="1" id="probationCustomDays" value="0"><span>天</span></label>
+            </div>
+            <p class="field-error" id="probationPeriodError"></p>
+          </fieldset>
+        </div>
+
+        <div class="form-section form-mode" data-form="contract">
+          <div class="field">
+            <label for="contractStart">契約開始日</label>
+            <input type="date" id="contractStart" data-date-input data-error="contractStartError">
+            <p class="date-helper" data-date-helper-for="contractStart"></p>
+            <p class="field-error" id="contractStartError"></p>
+          </div>
+
+          <fieldset class="field">
+            <legend>契約期間</legend>
+            <div class="quick-grid" data-quick-group="contract">
+              <label><input type="radio" name="contractPreset" value="0:3:0"><span>3 個月</span></label>
+              <label><input type="radio" name="contractPreset" value="0:6:0" checked><span>6 個月</span></label>
+              <label><input type="radio" name="contractPreset" value="1:0:0"><span>1 年</span></label>
+              <label><input type="radio" name="contractPreset" value="2:0:0"><span>2 年</span></label>
+              <label><input type="radio" name="contractPreset" value="3:0:0"><span>3 年</span></label>
+              <label><input type="radio" name="contractPreset" value="custom"><span>自訂</span></label>
+            </div>
+            <div class="custom-period" id="contractCustom">
+              <label><input type="number" min="0" step="1" id="contractCustomYears" value="0"><span>年</span></label>
+              <label><input type="number" min="0" step="1" id="contractCustomMonths" value="0"><span>個月</span></label>
+              <label><input type="number" min="0" step="1" id="contractCustomDays" value="0"><span>天</span></label>
+            </div>
+            <p class="field-error" id="contractPeriodError"></p>
+          </fieldset>
+        </div>
+
+        <div class="form-section form-mode" data-form="seniority">
+          <div class="field">
+            <label for="seniorityStart">到職日期</label>
+            <input type="date" id="seniorityStart" data-date-input data-error="seniorityStartError">
+            <p class="date-helper" data-date-helper-for="seniorityStart"></p>
+            <p class="field-error" id="seniorityStartError"></p>
+          </div>
+          <div class="field">
+            <label for="seniorityEnd">計算至</label>
+            <input type="date" id="seniorityEnd" data-date-input data-error="seniorityEndError">
+            <p class="date-helper" data-date-helper-for="seniorityEnd"></p>
+            <p class="field-error" id="seniorityEndError"></p>
+          </div>
+        </div>
+
+        <div class="form-section form-mode" data-form="document">
+          <div class="field">
+            <label for="documentName">文件名稱 <span class="optional">選填</span></label>
+            <input type="text" id="documentName" maxlength="60" placeholder="例如：證照、訓練證明、合約文件">
+          </div>
+          <div class="field">
+            <label for="documentStart">起始日期／核發日期</label>
+            <input type="date" id="documentStart" data-date-input data-error="documentStartError">
+            <p class="date-helper" data-date-helper-for="documentStart"></p>
+            <p class="field-error" id="documentStartError"></p>
+          </div>
+
+          <fieldset class="field">
+            <legend>有效期間</legend>
+            <div class="quick-grid" data-quick-group="document">
+              <label><input type="radio" name="documentPreset" value="0:0:30"><span>30 天</span></label>
+              <label><input type="radio" name="documentPreset" value="0:3:0"><span>3 個月</span></label>
+              <label><input type="radio" name="documentPreset" value="0:6:0"><span>6 個月</span></label>
+              <label><input type="radio" name="documentPreset" value="1:0:0" checked><span>1 年</span></label>
+              <label><input type="radio" name="documentPreset" value="2:0:0"><span>2 年</span></label>
+              <label><input type="radio" name="documentPreset" value="custom"><span>自訂</span></label>
+            </div>
+            <div class="custom-period" id="documentCustom">
+              <label><input type="number" min="0" step="1" id="documentCustomYears" value="0"><span>年</span></label>
+              <label><input type="number" min="0" step="1" id="documentCustomMonths" value="0"><span>個月</span></label>
+              <label><input type="number" min="0" step="1" id="documentCustomDays" value="0"><span>天</span></label>
+            </div>
+            <p class="field-error" id="documentPeriodError"></p>
+          </fieldset>
+
+          <fieldset class="field">
+            <legend>提前幾天計算提醒日期</legend>
+            <p class="field-note">僅計算建議提醒日期，不會主動發送通知。</p>
+            <div class="quick-grid reminder-grid">
+              <label><input type="radio" name="reminderPreset" value="none"><span>不計算</span></label>
+              <label><input type="radio" name="reminderPreset" value="7"><span>7 天</span></label>
+              <label><input type="radio" name="reminderPreset" value="14"><span>14 天</span></label>
+              <label><input type="radio" name="reminderPreset" value="30" checked><span>30 天</span></label>
+              <label><input type="radio" name="reminderPreset" value="60"><span>60 天</span></label>
+              <label><input type="radio" name="reminderPreset" value="90"><span>90 天</span></label>
+              <label><input type="radio" name="reminderPreset" value="custom"><span>自訂</span></label>
+            </div>
+            <div class="custom-reminder" id="reminderCustom">
+              <input type="number" min="0" step="1" id="reminderCustomValue" placeholder="提前天數">
+              <span class="unit-chip">天</span>
+            </div>
+            <p class="field-error" id="reminderError"></p>
+          </fieldset>
+        </div>
+
+        <details class="advanced">
+          <summary>進階計算設定</summary>
+          <fieldset class="field compact-field">
+            <legend>計算方式</legend>
+            <div class="method-options">
+              <label>
+                <input type="radio" name="method" value="inclusive" checked>
+                <span><strong>包含起始日計算</strong><small>例：8/10 起算 3 個月 → 11/09</small></span>
+              </label>
+              <label>
+                <input type="radio" name="method" value="direct">
+                <span><strong>日期直接往後推</strong><small>例：8/10 往後 3 個月 → 11/10</small></span>
+              </label>
+            </div>
+          </fieldset>
+        </details>
+
+        <div class="form-actions">
+          <button type="submit" class="primary-button">重新計算</button>
+          <button type="button" class="ghost-button" id="clearButton">清除</button>
+        </div>
+      </form>
+
+      <aside class="panel result-panel" aria-live="polite">
+        <div class="panel-heading result-heading">
+          <span class="panel-badge">2</span>
+          <div>
+            <h2>計算結果</h2>
+            <p id="resultHint">結果會依日期顯示設定同步更新。</p>
+          </div>
+        </div>
+
+        <div class="empty-result" id="emptyResult">
+          <strong>輸入日期後即可計算</strong>
+          <span>會依目前選擇的功能顯示到期日、年資或建議提醒日期。</span>
+        </div>
+
+        <div class="result-content" id="resultContent" hidden>
+          <p class="result-label" id="resultLabel"></p>
+          <div class="result-main" id="resultMain"></div>
+          <p class="secondary-date" id="secondaryDate"></p>
+          <div class="summary-list" id="summaryList"></div>
+          <p class="calculation-note" id="calculationNote"></p>
+          <div class="copy-box">
+            <label for="copyText">可複製摘要</label>
+            <textarea id="copyText" readonly></textarea>
+          </div>
+          <div class="result-actions">
+            <button type="button" class="primary-button" id="copyButton">複製結果</button>
+            <button type="button" class="ghost-button" id="recalculateButton">重新計算</button>
+            <button type="button" class="ghost-button" id="clearResultButton">清除</button>
+          </div>
+          <p class="copy-status" id="copyStatus" role="status"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="notice">
+      <p>本工具提供日期與期間試算，實際試用、契約、證照或文件效期，仍應以契約內容、主管機關規定及正式文件記載日期為準。</p>
+    </section>
+  </main>
+
+  <script src="tool.js"></script>
+</body>
+</html>
