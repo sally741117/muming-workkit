@@ -817,7 +817,7 @@ function renderCases() {
         <div class="case-head-actions">
           <button type="button" class="primary" data-action="pdf-case" data-case-id="${item.id}">${pdfPrimaryButtonLabel()}</button>
           ${isSamsungInternet()
-            ? `<button type="button" data-action="open-pdf-case" data-case-id="${item.id}">開啟 PDF</button>`
+            ? `<button type="button" data-action="share-pdf-viewer-case" data-case-id="${item.id}">分享 PDF</button>`
             : (shouldShowPdfShareAction()
               ? `<button type="button" data-action="share-pdf-case" data-case-id="${item.id}">分享 PDF</button>`
               : "")}
@@ -833,7 +833,7 @@ function renderCases() {
       if (action === "add-person") addPerson(item.id);
       if (action === "delete-case") deleteCase(item.id);
       if (action === "pdf-case") generatePdf(item.id);
-      if (action === "open-pdf-case") openCasePdf(item.id);
+      if (action === "share-pdf-viewer-case") sharePdfViaViewer(item.id);
       if (action === "share-pdf-case") void sharePdf(item.id, event.target.closest("button"));
     });
     el.cases.appendChild(box);
@@ -2679,17 +2679,19 @@ function generatePdf(caseId) {
   log(`已產生 ${bundle.filename}`);
 }
 
-function openCasePdf(caseId) {
+function sharePdfViaViewer(caseId) {
   const bundle = getPdfBundle(caseId);
   if (!bundle) return;
   openPdfPreview(bundle);
-  log(`已開啟 ${bundle.filename}`);
+  const message = "PDF 已開啟，請使用閱讀器的分享功能傳送。";
+  log(message);
+  showToast(message);
 }
 
 async function sharePdf(caseId, button) {
   if (button?.disabled) return;
   if (isSamsungInternet()) {
-    generatePdf(caseId);
+    sharePdfViaViewer(caseId);
     return;
   }
   const shareStartedAt = performance.now();
