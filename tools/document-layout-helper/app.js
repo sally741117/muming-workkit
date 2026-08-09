@@ -607,12 +607,13 @@ function personNode(caseId, person) {
 function slotEmptyMarkup() {
   return `<div class="slot-empty">
     <span class="desktop-slot-prompt">拖入或選擇檔案</span>
-    <span class="mobile-slot-prompt">點擊選擇照片</span>
+    <span class="mobile-slot-prompt">點擊加入證件</span>
     <button type="button" class="slot-pdf-link" data-file-kind="pdf">選擇 PDF</button>
   </div>`;
 }
 
 function usesMobileImageChooser() {
+  // V1 intentionally delegates photo-source selection to the native image chooser.
   return window.matchMedia?.("(pointer: coarse)").matches
     || /Android|iPad|iPhone|iPod/i.test(navigator.userAgent)
     || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
