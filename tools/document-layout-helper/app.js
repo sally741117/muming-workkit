@@ -3,6 +3,8 @@ const CARD_W_MM = 85;
 const CARD_H_MM = 54;
 const A4_W = 210;
 const A4_H = 297;
+const TOOL_CANONICAL_URL = "https://sally741117.github.io/muming-workkit/tools/document-layout-helper/";
+const TOOL_LINE_SHARE_URL = `${TOOL_CANONICAL_URL}?openExternalBrowser=1`;
 const state = {
   cards: [],
   cases: [],
@@ -48,6 +50,10 @@ const el = {
   slotCameraInput: document.querySelector("#slotCameraInput"),
   slotPdfInput: document.querySelector("#slotPdfInput"),
   slotMixedInput: document.querySelector("#slotMixedInput"),
+  lineAndroidFallbackDialog: document.querySelector("#lineAndroidFallbackDialog"),
+  openExternalBrowserLink: document.querySelector("#openExternalBrowserLink"),
+  copyExternalUrlBtn: document.querySelector("#copyExternalUrlBtn"),
+  closeLineFallbackBtn: document.querySelector("#closeLineFallbackBtn"),
   cases: document.querySelector("#cases"),
   addCaseBtn: document.querySelector("#addCaseBtn"),
   previewTitle: document.querySelector("#previewTitle"),
@@ -249,7 +255,7 @@ function refreshDiagnosticCapabilities(bundle = null) {
         diagnosticState.pdf.canShareUrl = Boolean(navigator.canShare({
           title: "MUMING",
           text: "PDF Share Test",
-          url: window.location.href
+          url: TOOL_LINE_SHARE_URL
         }));
       } catch (error) {
         diagnosticState.pdf.canShareUrlErrorName = error?.name || "Error";
@@ -356,6 +362,35 @@ function initDiagnostics() {
     showToast(copied ? "診斷結果已複製。" : "無法自動複製診斷結果。");
   });
 }
+
+function shouldShowLineAndroidFallback(options = {}) {
+  const userAgent = options.userAgent ?? navigator.userAgent;
+  const shareAvailable = options.shareAvailable ?? (typeof navigator.share === "function");
+  const debugMode = options.debugMode ?? diagnosticEnabled;
+  return !debugMode
+    && /Android/i.test(userAgent)
+    && inAppBrowserInfo(userAgent)?.id === "line"
+    && !shareAvailable;
+}
+
+function initLineAndroidFallback() {
+  el.openExternalBrowserLink.href = TOOL_LINE_SHARE_URL;
+  if (!shouldShowLineAndroidFallback()) return;
+  el.lineAndroidFallbackDialog.showModal();
+  requestAnimationFrame(() => el.openExternalBrowserLink.focus());
+}
+
+el.copyExternalUrlBtn.addEventListener("click", async () => {
+  const copied = await copyText(TOOL_LINE_SHARE_URL);
+  showToast(copied
+    ? "網址已複製，請貼到 Chrome 或其他瀏覽器開啟。"
+    : "無法自動複製，請長按網址後複製。"
+  );
+});
+
+el.closeLineFallbackBtn.addEventListener("click", () => {
+  if (el.lineAndroidFallbackDialog.open) el.lineAndroidFallbackDialog.close();
+});
 
 function isMobilePdfEnvironment() {
   return window.matchMedia?.("(pointer: coarse)").matches
@@ -2466,5 +2501,6 @@ async function sharePdf(caseId, button) {
 
 addDefaultCase();
 renderAll();
+initLineAndroidFallback();
 initDiagnostics();
 initEngines();

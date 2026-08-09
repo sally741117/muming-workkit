@@ -6,7 +6,7 @@
   <title>證件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260809-1">
+  <link rel="stylesheet" href="./tool.css?v=20260809-2">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -74,6 +74,20 @@
   <footer class="site-footer">
     <a href="../../index.html">© 2026 MUMING 牧茗製作</a>
   </footer>
+
+  <dialog id="lineAndroidFallbackDialog" class="line-android-fallback-dialog">
+    <div class="dialog-shell">
+      <div class="dialog-head">
+        <h2>請使用瀏覽器開啟</h2>
+        <button id="closeLineFallbackBtn" class="icon" aria-label="關閉" type="button">×</button>
+      </div>
+      <p>此 Android LINE 瀏覽器無法分享 PDF，請使用瀏覽器開啟。</p>
+      <div class="dialog-actions line-fallback-actions">
+        <a id="openExternalBrowserLink" class="button-link primary" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/?openExternalBrowser=1">開啟外部瀏覽器</a>
+        <button id="copyExternalUrlBtn" type="button">複製網址</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="cropDialog" class="crop-dialog">
     <form method="dialog" class="dialog-shell">
@@ -169,11 +183,11 @@
     </form>
   </dialog>
 
-  <input id="slotGalleryInput" type="file" accept="image/jpeg,image/png,image/webp,image/*" hidden>
+  <input id="slotGalleryInput" type="file" accept="image/*" hidden>
   <input id="slotCameraInput" type="file" accept="image/*" capture="environment" hidden>
-  <input id="slotPdfInput" type="file" accept="application/pdf,.pdf" hidden>
+  <input id="slotPdfInput" type="file" accept=".pdf,application/pdf" hidden>
   <input id="slotMixedInput" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" hidden>
 
-  <script src="./app.js?v=20260809-1"></script>
+  <script src="./app.js?v=20260809-2"></script>
 </body>
 </html>
