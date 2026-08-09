@@ -27,7 +27,6 @@ const state = {
   selectedCardId: null,
   slotChoice: null,
   replaceRequest: null,
-  sourcePickerSlot: null,
   fileChooserCallbacks: {},
   pointerDrag: null,
   cvReady: false,
@@ -47,12 +46,10 @@ const el = {
   testBlobDownloadBtn: document.querySelector("#testBlobDownloadBtn"),
   testBlobOpenBtn: document.querySelector("#testBlobOpenBtn"),
   copyDiagnosticBtn: document.querySelector("#copyDiagnosticBtn"),
+  androidUploadHint: document.querySelector("#androidUploadHint"),
   slotGalleryInput: document.querySelector("#slotGalleryInput"),
-  slotCameraInput: document.querySelector("#slotCameraInput"),
-  slotFilesInput: document.querySelector("#slotFilesInput"),
+  slotPdfInput: document.querySelector("#slotPdfInput"),
   slotMixedInput: document.querySelector("#slotMixedInput"),
-  sourcePickerDialog: document.querySelector("#sourcePickerDialog"),
-  closeSourcePickerBtn: document.querySelector("#closeSourcePickerBtn"),
   lineAndroidFallbackDialog: document.querySelector("#lineAndroidFallbackDialog"),
   openExternalBrowserLink: document.querySelector("#openExternalBrowserLink"),
   copyExternalUrlBtn: document.querySelector("#copyExternalUrlBtn"),
@@ -159,8 +156,7 @@ const diagnosticEnabled = new URLSearchParams(window.location.search).get("debug
 const diagnosticState = {
   inputs: {
     gallery: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 },
-    camera: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 },
-    files: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 }
+    pdf: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 }
   },
   pdf: {
     blobCreated: false,
@@ -217,8 +213,7 @@ function diagnosticSnapshot() {
     pdf: { ...diagnosticState.pdf },
     fileInputs: {
       gallery: { ...diagnosticState.inputs.gallery },
-      camera: { ...diagnosticState.inputs.camera },
-      files: { ...diagnosticState.inputs.files }
+      pdf: { ...diagnosticState.inputs.pdf }
     }
   };
 }
@@ -612,54 +607,34 @@ function personNode(caseId, person) {
 function slotEmptyMarkup() {
   return `<div class="slot-empty">
     <span class="desktop-slot-prompt">拖入或選擇檔案</span>
-    <span class="mobile-slot-prompt">點擊加入證件</span>
+    <span class="mobile-slot-prompt">點擊選擇照片</span>
+    <button type="button" class="slot-pdf-link" data-file-kind="pdf">選擇 PDF</button>
   </div>`;
 }
 
-function usesMobileSourcePicker() {
+function usesMobileImageChooser() {
   return window.matchMedia?.("(pointer: coarse)").matches
-    || window.matchMedia?.("(max-width: 920px)").matches;
+    || /Android|iPad|iPhone|iPod/i.test(navigator.userAgent)
+    || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 }
 
-function openSourcePicker(slot) {
-  state.sourcePickerSlot = slot;
-  el.sourcePickerDialog.showModal();
-  requestAnimationFrame(() => {
-    el.sourcePickerDialog.querySelector("[data-source-kind]")?.focus();
-  });
+function initUploadEnvironment() {
+  document.documentElement.classList.toggle("mobile-upload-ui", usesMobileImageChooser());
+  el.androidUploadHint.hidden = !/Android/i.test(navigator.userAgent);
 }
-
-function closeSourcePicker() {
-  state.sourcePickerSlot = null;
-  if (el.sourcePickerDialog.open) el.sourcePickerDialog.close();
-}
-
-function chooseSourceForSlot(kind) {
-  const slot = state.sourcePickerSlot;
-  if (!slot) return;
-  state.sourcePickerSlot = null;
-  el.sourcePickerDialog.close();
-  chooseFilesForSlot(slot, kind);
-}
-
-el.sourcePickerDialog.querySelectorAll("[data-source-kind]").forEach((button) => {
-  button.addEventListener("click", () => chooseSourceForSlot(button.dataset.sourceKind));
-});
-el.closeSourcePickerBtn.addEventListener("click", closeSourcePicker);
-el.sourcePickerDialog.addEventListener("cancel", () => {
-  state.sourcePickerSlot = null;
-});
-el.sourcePickerDialog.addEventListener("click", (event) => {
-  if (event.target === el.sourcePickerDialog) closeSourcePicker();
-});
 
 function wireSlot(slot) {
   slot.addEventListener("click", (event) => {
     if (event.target.closest(".card")) return;
+    const picker = event.target.closest("[data-file-kind='pdf']");
+    if (picker) {
+      event.stopPropagation();
+      chooseFilesForSlot(slot, "pdf");
+      return;
+    }
     if (!state.selectedCardId) {
       if (slot.querySelector(".card")) return;
-      if (usesMobileSourcePicker()) openSourcePicker(slot);
-      else chooseFilesForSlot(slot);
+      chooseFilesForSlot(slot, usesMobileImageChooser() ? "gallery" : "mixed");
       return;
     }
     assignCard(state.selectedCardId, slot.dataset.caseId, slot.dataset.personId, slot.dataset.side);
@@ -689,8 +664,7 @@ function isSupportedFile(file) {
 function chooseFiles(callback, kind = "mixed") {
   const inputs = {
     gallery: el.slotGalleryInput,
-    camera: el.slotCameraInput,
-    files: el.slotFilesInput,
+    pdf: el.slotPdfInput,
     mixed: el.slotMixedInput
   };
   const input = inputs[kind] || inputs.mixed;
@@ -2533,6 +2507,7 @@ async function sharePdf(caseId, button) {
   }
 }
 
+initUploadEnvironment();
 addDefaultCase();
 renderAll();
 initLineAndroidFallback();

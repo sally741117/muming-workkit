@@ -200,6 +200,14 @@ button:disabled { opacity: .55; cursor: wait; }
 
 .status-log:empty { display: none; }
 
+.android-upload-hint {
+  margin: -2px 0 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.android-upload-hint[hidden] { display: none; }
+
 .diagnostic-panel {
   margin-bottom: 14px;
   border-color: #b7d3ce;
@@ -367,7 +375,22 @@ button:disabled { opacity: .55; cursor: wait; }
 
 .slot-label { margin-bottom: 3px; color: var(--muted); font-size: 12px; }
 .slot-empty { color: var(--muted); font-size: 12px; }
-.mobile-slot-prompt { display: none; }
+.mobile-slot-prompt,
+.slot-pdf-link { display: none; }
+.mobile-upload-ui .desktop-slot-prompt { display: none; }
+.mobile-upload-ui .mobile-slot-prompt { display: inline; }
+.mobile-upload-ui .slot-pdf-link {
+  display: block;
+  min-height: 24px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .slot:has(.card) { min-height: 112px; cursor: default; }
 .slot:has(.card) .slot-empty { display: none; }
 .slot .card { padding: 6px; box-shadow: none; }
@@ -490,36 +513,6 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   line-height: 1.7;
 }
 .line-fallback-actions { flex-wrap: wrap; }
-
-.source-picker-dialog {
-  width: 100%;
-  max-width: none;
-  margin: auto 0 0;
-  border-radius: 8px 8px 0 0;
-}
-
-.source-picker-shell {
-  padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
-}
-
-.source-picker-handle {
-  width: 40px;
-  height: 4px;
-  margin: 0 auto 12px;
-  border-radius: 999px;
-  background: #c7d1ce;
-}
-
-.source-picker-actions {
-  display: grid;
-  gap: 8px;
-}
-
-.source-picker-actions button {
-  min-height: 48px;
-  padding: 0 16px;
-  text-align: left;
-}
 
 .crop-dialog {
   max-height: calc(100vh - 28px);
@@ -712,11 +705,6 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
     background: rgba(255, 255, 255, .98);
   }
   .page { transform-origin: top center; zoom: .72; }
-}
-
-@media (max-width: 920px), (pointer: coarse) {
-  .desktop-slot-prompt { display: none; }
-  .mobile-slot-prompt { display: inline; }
 }
 
 @media (pointer: coarse) {
