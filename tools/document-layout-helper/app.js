@@ -606,7 +606,7 @@ function personNode(caseId, person) {
 
 function slotEmptyMarkup() {
   return `<div class="slot-empty">
-    <span class="desktop-slot-prompt">拖入或選擇檔案</span>
+    <span class="desktop-slot-prompt">拖入或點擊加入證件</span>
     <span class="mobile-slot-prompt">點擊加入證件</span>
     <button type="button" class="slot-pdf-link" data-file-kind="pdf">選擇 PDF</button>
   </div>`;
