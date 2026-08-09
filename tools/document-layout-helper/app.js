@@ -31,7 +31,6 @@ const state = {
   pointerDrag: null,
   cvReady: false,
   pdfReady: false,
-  activePreviewCaseId: null,
   pdfCache: new Map(),
   pdfWarmTimers: new Map()
 };
@@ -60,8 +59,6 @@ const el = {
   closeLineFallbackBtn: document.querySelector("#closeLineFallbackBtn"),
   cases: document.querySelector("#cases"),
   addCaseBtn: document.querySelector("#addCaseBtn"),
-  previewTitle: document.querySelector("#previewTitle"),
-  a4Preview: document.querySelector("#a4Preview"),
   cropDialog: document.querySelector("#cropDialog"),
   cropAssignmentContext: document.querySelector("#cropAssignmentContext"),
   cropCanvas: document.querySelector("#cropCanvas"),
@@ -658,6 +655,10 @@ function isSamsungInternet(userAgent = navigator.userAgent) {
   return /SamsungBrowser\//i.test(userAgent || "");
 }
 
+function pdfPrimaryButtonLabel(userAgent = navigator.userAgent) {
+  return isSamsungInternet(userAgent) ? "下載 PDF" : "產生 PDF";
+}
+
 function shouldShowPdfShareAction(options = {}) {
   const userAgent = options.userAgent ?? navigator.userAgent;
   const shareAvailable = options.shareAvailable ?? (typeof navigator.share === "function");
@@ -668,7 +669,7 @@ function shouldShowPdfShareAction(options = {}) {
 
 function updatePdfActions() {
   el.cases.querySelectorAll('[data-action="pdf-case"]').forEach((button) => {
-    button.textContent = isSamsungInternet() ? "下載 PDF" : "產生 PDF";
+    button.textContent = pdfPrimaryButtonLabel();
   });
 }
 
@@ -723,7 +724,6 @@ function addDefaultCase() {
     ]
   };
   state.cases.push(caseItem);
-  if (!state.activePreviewCaseId) state.activePreviewCaseId = caseItem.id;
 }
 
 function renderAll() {
@@ -815,11 +815,12 @@ function renderCases() {
       <div class="case-head">
         <h3>${item.title}</h3>
         <div class="case-head-actions">
-          <button type="button" class="secondary" data-action="preview-case" data-case-id="${item.id}">預覽此案件</button>
-          <button type="button" class="primary" data-action="pdf-case" data-case-id="${item.id}">產生 PDF</button>
-          ${shouldShowPdfShareAction()
-            ? `<button type="button" data-action="share-pdf-case" data-case-id="${item.id}">分享 PDF</button>`
-            : ""}
+          <button type="button" class="primary" data-action="pdf-case" data-case-id="${item.id}">${pdfPrimaryButtonLabel()}</button>
+          ${isSamsungInternet()
+            ? `<button type="button" data-action="open-pdf-case" data-case-id="${item.id}">開啟 PDF</button>`
+            : (shouldShowPdfShareAction()
+              ? `<button type="button" data-action="share-pdf-case" data-case-id="${item.id}">分享 PDF</button>`
+              : "")}
           ${caseIndex > 0 ? '<button type="button" data-action="delete-case">刪除案件</button>' : ""}
         </div>
       </div>
@@ -831,8 +832,8 @@ function renderCases() {
       const action = event.target.closest("button")?.dataset.action;
       if (action === "add-person") addPerson(item.id);
       if (action === "delete-case") deleteCase(item.id);
-      if (action === "preview-case") renderA4Preview(item.id);
       if (action === "pdf-case") generatePdf(item.id);
+      if (action === "open-pdf-case") openCasePdf(item.id);
       if (action === "share-pdf-case") void sharePdf(item.id, event.target.closest("button"));
     });
     el.cases.appendChild(box);
@@ -1086,10 +1087,6 @@ function deleteCase(caseId) {
   const removedIds = new Set(found?.people.flatMap((person) => [person.front, person.back]).filter(Boolean) || []);
   state.cards = state.cards.filter((card) => !removedIds.has(card.id));
   state.cases = state.cases.filter((item) => item.id !== caseId);
-  if (state.activePreviewCaseId === caseId) {
-    state.activePreviewCaseId = state.cases[0]?.id || null;
-    renderA4Preview(state.activePreviewCaseId);
-  }
   renderAll();
 }
 
@@ -2575,58 +2572,15 @@ function buildCasePages(caseId) {
   return pages;
 }
 
-function renderA4Preview(caseId) {
-  const caseItem = state.cases.find((item) => item.id === caseId);
-  if (!caseItem) {
-    el.previewTitle.textContent = "A4 預覽";
-    el.a4Preview.classList.add("empty");
-    el.a4Preview.innerHTML = "<p>請先新增案件</p>";
-    return;
-  }
-  state.activePreviewCaseId = caseId;
-  const pages = buildCasePages(caseId);
-  el.previewTitle.textContent = `A4 預覽｜${caseItem.title}`;
-  el.a4Preview.innerHTML = "";
-  el.a4Preview.classList.toggle("empty", pages.length === 0);
-  if (!pages.length) {
-    el.a4Preview.innerHTML = `<p>${caseItem.title} 尚未放入任何證件</p>`;
-    return;
-  }
-  pages.forEach((rows) => {
-    const page = document.createElement("div");
-    page.className = "page";
-    rows.forEach((row) => {
-      const line = document.createElement("div");
-      line.className = "print-row";
-      line.appendChild(printCell(row.front));
-      line.appendChild(printCell(row.back));
-      page.appendChild(line);
-    });
-    el.a4Preview.appendChild(page);
-  });
-}
-
-function printCell(card) {
-  const cell = document.createElement("div");
-  cell.className = "print-cell";
-  cell.innerHTML = card ? `<img src="${card.currentDataUrl}" alt="${card.name}">` : '<span class="empty-print">空白</span>';
-  return cell;
-}
-
 function pdfFilename(caseItem) {
   const caseName = caseItem.title.replace(/\s+/g, "");
   return `${caseName}_證件影本.pdf`;
 }
 
-function buildPdfBundle(caseId, options = {}) {
-  const renderPreview = options.renderPreview ?? true;
+function buildPdfBundle(caseId) {
   const caseItem = state.cases.find((item) => item.id === caseId);
   const pages = buildCasePages(caseId);
-  if (!caseItem || !pages.length) {
-    if (renderPreview) renderA4Preview(caseId);
-    return null;
-  }
-  if (renderPreview) renderA4Preview(caseId);
+  if (!caseItem || !pages.length) return null;
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const marginX = 12;
@@ -2666,7 +2620,7 @@ function schedulePdfCacheWarm(caseId) {
     state.pdfWarmTimers.delete(caseId);
     if (!state.pdfCache.has(caseId) && rowsForCase(caseId).length) {
       try {
-        buildPdfBundle(caseId, { renderPreview: false });
+        buildPdfBundle(caseId);
       } catch (error) {
         console.warn("PDF cache preparation failed.", error);
       }
@@ -2723,6 +2677,13 @@ function generatePdf(caseId) {
   }
   downloadPdf(bundle);
   log(`已產生 ${bundle.filename}`);
+}
+
+function openCasePdf(caseId) {
+  const bundle = getPdfBundle(caseId);
+  if (!bundle) return;
+  openPdfPreview(bundle);
+  log(`已開啟 ${bundle.filename}`);
 }
 
 async function sharePdf(caseId, button) {

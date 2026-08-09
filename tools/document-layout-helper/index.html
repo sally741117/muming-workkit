@@ -6,7 +6,7 @@
   <title>證件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260809-5">
+  <link rel="stylesheet" href="./tool.css?v=20260809-6">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -26,8 +26,7 @@
       <span>2 自動裁切</span>
       <span>3 確認</span>
       <span>4 分組</span>
-      <span>5 A4 預覽</span>
-      <span>6 PDF</span>
+      <span>5 PDF</span>
     </section>
 
     <section id="diagnosticPanel" class="panel diagnostic-panel" aria-labelledby="diagnosticTitle" hidden>
@@ -68,14 +67,6 @@
       </section>
     </section>
 
-    <section class="panel preview-panel">
-      <div class="panel-head">
-        <h2 id="previewTitle">A4 預覽｜案件 1</h2>
-      </div>
-      <div id="a4Preview" class="a4-preview empty">
-        <p>請從案件選擇「預覽此案件」</p>
-      </div>
-    </section>
   </main>
 
   <footer class="site-footer">
@@ -194,6 +185,6 @@
   <input id="slotPdfInput" type="file" accept="application/pdf,.pdf" hidden>
   <input id="slotMixedInput" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" hidden>
 
-  <script src="./app.js?v=20260809-10"></script>
+  <script src="./app.js?v=20260809-11"></script>
 </body>
 </html>

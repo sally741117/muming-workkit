@@ -269,8 +269,7 @@ button:disabled { opacity: .55; cursor: wait; }
   min-height: 180px;
 }
 
-.card-list.empty,
-.a4-preview.empty {
+.card-list.empty {
   display: grid;
   place-items: center;
   color: var(--muted);
@@ -467,55 +466,7 @@ button:disabled { opacity: .55; cursor: wait; }
   background: #eef2f1;
 }
 
-.preview-panel { margin-top: 16px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-.a4-preview {
-  display: grid;
-  gap: 18px;
-  justify-content: center;
-  min-height: 240px;
-  overflow: auto;
-  padding: 18px;
-  background: #dfe7e4;
-}
-
-.page {
-  width: 210mm;
-  min-height: 297mm;
-  padding: 14mm 12mm;
-  background: #fff;
-  box-shadow: 0 8px 28px rgba(0,0,0,.18);
-}
-
-.print-row {
-  display: grid;
-  grid-template-columns: 85mm 85mm;
-  grid-auto-rows: 54mm;
-  gap: 8mm;
-  margin-bottom: 8mm;
-  page-break-inside: avoid;
-}
-
-.print-cell {
-  width: 85mm;
-  height: 54mm;
-  border: 0.2mm solid #cfd8d5;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-}
-
-.print-cell img {
-  width: 85mm;
-  height: 54mm;
-  object-fit: contain;
-}
-
-.empty-print {
-  color: #9aa5a3;
-  font-size: 12px;
-}
 
 dialog {
   width: min(1180px, calc(100vw - 28px));
@@ -687,8 +638,8 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 @media (max-width: 920px) {
   .topbar { grid-template-columns: 1fr; align-items: start; }
   .topbar { display: grid; }
-  .case-head { align-items: flex-start; }
-  .case-head-actions { justify-content: flex-start; }
+  .case-head { flex-direction: column; align-items: flex-start; }
+  .case-head-actions { width: 100%; justify-content: flex-start; }
   .crop-grid { grid-template-columns: 1fr; }
   .crop-dialog {
     width: calc(100vw - 12px);
@@ -725,18 +676,10 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
     border-top: 1px solid var(--line);
     background: rgba(255, 255, 255, .98);
   }
-  .page { transform-origin: top center; zoom: .72; }
 }
 
 @media (pointer: coarse) {
   .keyboard-crop-hint { display: none; }
   .touch-crop-hint { display: inline; }
   .crop-dialog button { min-height: 44px; }
-}
-
-@media print {
-  body { background: #fff; }
-  .topbar, .steps, .workspace, .preview-panel > .panel-head, .site-footer { display: none; }
-  main, .panel, .a4-preview { padding: 0; margin: 0; border: 0; box-shadow: none; background: #fff; }
-  .page { box-shadow: none; page-break-after: always; }
 }
