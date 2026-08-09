@@ -45,6 +45,8 @@ const el = {
   testUrlShareBtn: document.querySelector("#testUrlShareBtn"),
   testPdfShareBtn: document.querySelector("#testPdfShareBtn"),
   testImageShareBtn: document.querySelector("#testImageShareBtn"),
+  diagnosticImagePreview: document.querySelector("#diagnosticImagePreview"),
+  diagnosticImagePreviewImg: document.querySelector("#diagnosticImagePreviewImg"),
   testBlobDownloadBtn: document.querySelector("#testBlobDownloadBtn"),
   testBlobOpenBtn: document.querySelector("#testBlobOpenBtn"),
   copyDiagnosticBtn: document.querySelector("#copyDiagnosticBtn"),
@@ -157,6 +159,7 @@ async function copyText(text) {
 const diagnosticEnabled = new URLSearchParams(window.location.search).get("debug") === "1";
 let diagnosticReadyPdfBundle = null;
 let diagnosticReadyImageFile = null;
+let diagnosticImagePreviewUrl = null;
 const diagnosticState = {
   inputs: {
     gallery: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 },
@@ -200,6 +203,8 @@ const diagnosticState = {
     fileName: "",
     fileType: "",
     fileSize: 0,
+    width: 600,
+    height: 400,
     canShareFiles: null,
     canShareFilesErrorName: "",
     canShareFilesErrorMessage: "",
@@ -258,9 +263,32 @@ function createDiagnosticPdfBundle() {
 }
 
 function createDiagnosticImageFile() {
-  const binary = atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
-  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-  return new File([bytes], "muming-share-test.png", { type: "image/png" });
+  const canvas = document.createElement("canvas");
+  canvas.width = 600;
+  canvas.height = 400;
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillStyle = "#0b6b5f";
+  context.font = "700 68px Arial, sans-serif";
+  context.fillText("MUMING", 300, 135);
+  context.fillStyle = "#1f2933";
+  context.font = "600 46px Arial, sans-serif";
+  context.fillText("Image Share Test", 300, 215);
+  context.fillStyle = "#66736f";
+  context.font = "24px Arial, sans-serif";
+  context.fillText("Samsung Internet Web Share Test", 300, 315);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Unable to create diagnostic PNG."));
+        return;
+      }
+      resolve(new File([blob], "muming-image-share-test.png", { type: "image/png" }));
+    }, "image/png");
+  });
 }
 
 function diagnosticSnapshot() {
@@ -540,17 +568,40 @@ function recordDiagnosticInput(kind, files) {
   renderDiagnostic();
 }
 
+async function prepareDiagnosticImage() {
+  el.testImageShareBtn.disabled = true;
+  el.testImageShareBtn.textContent = "準備測試圖片…";
+  try {
+    diagnosticReadyImageFile = await createDiagnosticImageFile();
+    diagnosticState.image.readyBeforeClick = true;
+    diagnosticState.image.readyCreatedAt = new Date().toISOString();
+    if (diagnosticImagePreviewUrl) URL.revokeObjectURL(diagnosticImagePreviewUrl);
+    diagnosticImagePreviewUrl = URL.createObjectURL(diagnosticReadyImageFile);
+    el.diagnosticImagePreviewImg.src = diagnosticImagePreviewUrl;
+    el.diagnosticImagePreview.hidden = false;
+    refreshDiagnosticImageCapabilities(diagnosticReadyImageFile);
+  } catch (error) {
+    diagnosticReadyImageFile = null;
+    diagnosticState.image.readyBeforeClick = false;
+    diagnosticState.image.result = "image-creation-error";
+    diagnosticState.image.errorName = error?.name || "Error";
+    diagnosticState.image.errorMessage = error?.message || String(error);
+    renderDiagnostic();
+  } finally {
+    el.testImageShareBtn.disabled = !diagnosticReadyImageFile;
+    el.testImageShareBtn.textContent = diagnosticReadyImageFile
+      ? "立即分享測試圖片"
+      : "測試圖片建立失敗";
+  }
+}
+
 function initDiagnostics() {
   if (!diagnosticEnabled) return;
   el.diagnosticPanel.hidden = false;
   diagnosticReadyPdfBundle = createDiagnosticPdfBundle();
-  diagnosticReadyImageFile = createDiagnosticImageFile();
   diagnosticState.pdf.readyBeforeClick = Boolean(diagnosticReadyPdfBundle.file);
   diagnosticState.pdf.readyCreatedAt = new Date().toISOString();
-  diagnosticState.image.readyBeforeClick = diagnosticReadyImageFile instanceof File;
-  diagnosticState.image.readyCreatedAt = new Date().toISOString();
   refreshDiagnosticCapabilities(diagnosticReadyPdfBundle);
-  refreshDiagnosticImageCapabilities(diagnosticReadyImageFile);
   el.refreshDiagnosticBtn.addEventListener("click", () => {
     refreshDiagnosticCapabilities();
     refreshDiagnosticImageCapabilities();
@@ -564,6 +615,7 @@ function initDiagnostics() {
     const copied = await copyText(el.diagnosticOutput.textContent);
     showToast(copied ? "診斷結果已複製。" : "無法自動複製診斷結果。");
   });
+  void prepareDiagnosticImage();
 }
 
 function shouldShowLineAndroidFallback(options = {}) {

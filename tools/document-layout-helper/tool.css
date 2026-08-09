@@ -234,6 +234,27 @@ button:disabled { opacity: .55; cursor: wait; }
   overflow-wrap: anywhere;
 }
 
+.diagnostic-image-preview {
+  width: min(100%, 360px);
+  margin: 12px 0 0;
+}
+
+.diagnostic-image-preview[hidden] { display: none; }
+
+.diagnostic-image-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.diagnostic-image-preview figcaption {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .diagnostic-actions {
   display: flex;
   flex-wrap: wrap;
