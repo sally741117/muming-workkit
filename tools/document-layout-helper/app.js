@@ -27,6 +27,7 @@ const state = {
   selectedCardId: null,
   slotChoice: null,
   replaceRequest: null,
+  sourcePickerSlot: null,
   fileChooserCallbacks: {},
   pointerDrag: null,
   cvReady: false,
@@ -48,8 +49,10 @@ const el = {
   copyDiagnosticBtn: document.querySelector("#copyDiagnosticBtn"),
   slotGalleryInput: document.querySelector("#slotGalleryInput"),
   slotCameraInput: document.querySelector("#slotCameraInput"),
-  slotPdfInput: document.querySelector("#slotPdfInput"),
+  slotFilesInput: document.querySelector("#slotFilesInput"),
   slotMixedInput: document.querySelector("#slotMixedInput"),
+  sourcePickerDialog: document.querySelector("#sourcePickerDialog"),
+  closeSourcePickerBtn: document.querySelector("#closeSourcePickerBtn"),
   lineAndroidFallbackDialog: document.querySelector("#lineAndroidFallbackDialog"),
   openExternalBrowserLink: document.querySelector("#openExternalBrowserLink"),
   copyExternalUrlBtn: document.querySelector("#copyExternalUrlBtn"),
@@ -157,7 +160,7 @@ const diagnosticState = {
   inputs: {
     gallery: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 },
     camera: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 },
-    pdf: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 }
+    files: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 }
   },
   pdf: {
     blobCreated: false,
@@ -215,7 +218,7 @@ function diagnosticSnapshot() {
     fileInputs: {
       gallery: { ...diagnosticState.inputs.gallery },
       camera: { ...diagnosticState.inputs.camera },
-      pdf: { ...diagnosticState.inputs.pdf }
+      files: { ...diagnosticState.inputs.files }
     }
   };
 }
@@ -609,26 +612,54 @@ function personNode(caseId, person) {
 function slotEmptyMarkup() {
   return `<div class="slot-empty">
     <span class="desktop-slot-prompt">拖入或選擇檔案</span>
-    <div class="mobile-slot-actions" aria-label="加入證件">
-      <button type="button" data-file-kind="gallery">從相簿選擇</button>
-      <button type="button" data-file-kind="camera">直接拍照</button>
-      <button type="button" class="slot-pdf-button" data-file-kind="pdf">選擇 PDF</button>
-    </div>
+    <span class="mobile-slot-prompt">點擊加入證件</span>
   </div>`;
 }
+
+function usesMobileSourcePicker() {
+  return window.matchMedia?.("(pointer: coarse)").matches
+    || window.matchMedia?.("(max-width: 920px)").matches;
+}
+
+function openSourcePicker(slot) {
+  state.sourcePickerSlot = slot;
+  el.sourcePickerDialog.showModal();
+  requestAnimationFrame(() => {
+    el.sourcePickerDialog.querySelector("[data-source-kind]")?.focus();
+  });
+}
+
+function closeSourcePicker() {
+  state.sourcePickerSlot = null;
+  if (el.sourcePickerDialog.open) el.sourcePickerDialog.close();
+}
+
+function chooseSourceForSlot(kind) {
+  const slot = state.sourcePickerSlot;
+  if (!slot) return;
+  state.sourcePickerSlot = null;
+  el.sourcePickerDialog.close();
+  chooseFilesForSlot(slot, kind);
+}
+
+el.sourcePickerDialog.querySelectorAll("[data-source-kind]").forEach((button) => {
+  button.addEventListener("click", () => chooseSourceForSlot(button.dataset.sourceKind));
+});
+el.closeSourcePickerBtn.addEventListener("click", closeSourcePicker);
+el.sourcePickerDialog.addEventListener("cancel", () => {
+  state.sourcePickerSlot = null;
+});
+el.sourcePickerDialog.addEventListener("click", (event) => {
+  if (event.target === el.sourcePickerDialog) closeSourcePicker();
+});
 
 function wireSlot(slot) {
   slot.addEventListener("click", (event) => {
     if (event.target.closest(".card")) return;
-    const picker = event.target.closest("[data-file-kind]");
-    if (picker) {
-      event.stopPropagation();
-      chooseFilesForSlot(slot, picker.dataset.fileKind);
-      return;
-    }
     if (!state.selectedCardId) {
       if (slot.querySelector(".card")) return;
-      chooseFilesForSlot(slot);
+      if (usesMobileSourcePicker()) openSourcePicker(slot);
+      else chooseFilesForSlot(slot);
       return;
     }
     assignCard(state.selectedCardId, slot.dataset.caseId, slot.dataset.personId, slot.dataset.side);
@@ -659,7 +690,7 @@ function chooseFiles(callback, kind = "mixed") {
   const inputs = {
     gallery: el.slotGalleryInput,
     camera: el.slotCameraInput,
-    pdf: el.slotPdfInput,
+    files: el.slotFilesInput,
     mixed: el.slotMixedInput
   };
   const input = inputs[kind] || inputs.mixed;
@@ -673,6 +704,9 @@ function chooseFiles(callback, kind = "mixed") {
       const handler = state.fileChooserCallbacks[kind];
       delete state.fileChooserCallbacks[kind];
       if (handler) handler(files);
+    });
+    input.addEventListener("cancel", () => {
+      delete state.fileChooserCallbacks[kind];
     });
   }
   state.fileChooserCallbacks[kind] = callback;

@@ -367,7 +367,7 @@ button:disabled { opacity: .55; cursor: wait; }
 
 .slot-label { margin-bottom: 3px; color: var(--muted); font-size: 12px; }
 .slot-empty { color: var(--muted); font-size: 12px; }
-.mobile-slot-actions { display: none; }
+.mobile-slot-prompt { display: none; }
 .slot:has(.card) { min-height: 112px; cursor: default; }
 .slot:has(.card) .slot-empty { display: none; }
 .slot .card { padding: 6px; box-shadow: none; }
@@ -490,6 +490,36 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   line-height: 1.7;
 }
 .line-fallback-actions { flex-wrap: wrap; }
+
+.source-picker-dialog {
+  width: 100%;
+  max-width: none;
+  margin: auto 0 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.source-picker-shell {
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.source-picker-handle {
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  background: #c7d1ce;
+}
+
+.source-picker-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.source-picker-actions button {
+  min-height: 48px;
+  padding: 0 16px;
+  text-align: left;
+}
 
 .crop-dialog {
   max-height: calc(100vh - 28px);
@@ -686,24 +716,7 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 
 @media (max-width: 920px), (pointer: coarse) {
   .desktop-slot-prompt { display: none; }
-  .mobile-slot-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px;
-  }
-  .mobile-slot-actions button {
-    min-width: 0;
-    min-height: 34px;
-    padding: 0 6px;
-    font-size: 12px;
-  }
-  .mobile-slot-actions .slot-pdf-button {
-    grid-column: 1 / -1;
-    min-height: 26px;
-    border-color: transparent;
-    background: transparent;
-    color: var(--accent);
-  }
+  .mobile-slot-prompt { display: inline; }
 }
 
 @media (pointer: coarse) {
