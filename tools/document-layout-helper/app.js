@@ -44,6 +44,7 @@ const el = {
   refreshDiagnosticBtn: document.querySelector("#refreshDiagnosticBtn"),
   testUrlShareBtn: document.querySelector("#testUrlShareBtn"),
   testPdfShareBtn: document.querySelector("#testPdfShareBtn"),
+  testImageShareBtn: document.querySelector("#testImageShareBtn"),
   testBlobDownloadBtn: document.querySelector("#testBlobDownloadBtn"),
   testBlobOpenBtn: document.querySelector("#testBlobOpenBtn"),
   copyDiagnosticBtn: document.querySelector("#copyDiagnosticBtn"),
@@ -155,6 +156,7 @@ async function copyText(text) {
 
 const diagnosticEnabled = new URLSearchParams(window.location.search).get("debug") === "1";
 let diagnosticReadyPdfBundle = null;
+let diagnosticReadyImageFile = null;
 const diagnosticState = {
   inputs: {
     gallery: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 },
@@ -192,6 +194,23 @@ const diagnosticState = {
     shareErrorMessage: "",
     blobDownload: "not-tested",
     blobOpen: "not-tested"
+  },
+  image: {
+    fileCreated: false,
+    fileName: "",
+    fileType: "",
+    fileSize: 0,
+    canShareFiles: null,
+    canShareFilesErrorName: "",
+    canShareFilesErrorMessage: "",
+    readyBeforeClick: false,
+    readyCreatedAt: "",
+    shareActivationIsActive: null,
+    shareActivationHasBeenActive: null,
+    clickToShareMs: null,
+    result: "not-tested",
+    errorName: "",
+    errorMessage: ""
   },
   formalShare: {
     result: "not-tested",
@@ -238,6 +257,12 @@ function createDiagnosticPdfBundle() {
   return { blob, file };
 }
 
+function createDiagnosticImageFile() {
+  const binary = atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new File([bytes], "muming-share-test.png", { type: "image/png" });
+}
+
 function diagnosticSnapshot() {
   const inApp = inAppBrowserInfo();
   return {
@@ -257,6 +282,7 @@ function diagnosticSnapshot() {
     },
     urlShare: { ...diagnosticState.urlShare },
     pdf: { ...diagnosticState.pdf },
+    image: { ...diagnosticState.image },
     formalShare: { ...diagnosticState.formalShare },
     fileInputs: {
       gallery: { ...diagnosticState.inputs.gallery },
@@ -311,6 +337,26 @@ function refreshDiagnosticCapabilities(bundle = null) {
     diagnosticState.pdf.shareResult = "capability-check-error";
     diagnosticState.pdf.shareErrorName = error?.name || "Error";
     diagnosticState.pdf.shareErrorMessage = error?.message || String(error);
+  }
+  renderDiagnostic();
+}
+
+function refreshDiagnosticImageCapabilities(file = diagnosticReadyImageFile) {
+  if (!diagnosticEnabled) return;
+  diagnosticState.image.fileCreated = file instanceof File;
+  diagnosticState.image.fileName = file?.name || "";
+  diagnosticState.image.fileType = file?.type || "";
+  diagnosticState.image.fileSize = file?.size || 0;
+  diagnosticState.image.canShareFiles = false;
+  diagnosticState.image.canShareFilesErrorName = "";
+  diagnosticState.image.canShareFilesErrorMessage = "";
+  if (file && typeof navigator.canShare === "function") {
+    try {
+      diagnosticState.image.canShareFiles = Boolean(navigator.canShare({ files: [file] }));
+    } catch (error) {
+      diagnosticState.image.canShareFilesErrorName = error?.name || "Error";
+      diagnosticState.image.canShareFilesErrorMessage = error?.message || String(error);
+    }
   }
   renderDiagnostic();
 }
@@ -409,6 +455,44 @@ function testDiagnosticPdfShare() {
   }
 }
 
+function testDiagnosticImageShare() {
+  if (el.testImageShareBtn.disabled) return;
+  const startedAt = performance.now();
+  const activation = userActivationSnapshot();
+  const file = diagnosticReadyImageFile;
+  Object.assign(diagnosticState.image, {
+    readyBeforeClick: file instanceof File,
+    shareActivationIsActive: activation.isActive,
+    shareActivationHasBeenActive: activation.hasBeenActive,
+    clickToShareMs: null,
+    result: "calling-share",
+    errorName: "",
+    errorMessage: ""
+  });
+  try {
+    if (typeof navigator.share !== "function") {
+      diagnosticState.image.result = "navigator.share-missing";
+      renderDiagnostic();
+      return;
+    }
+    if (!file || typeof navigator.canShare !== "function" || !navigator.canShare({ files: [file] })) {
+      diagnosticState.image.result = "file-share-not-supported";
+      renderDiagnostic();
+      return;
+    }
+    const sharePromise = navigator.share({ files: [file], title: "MUMING Image Share Test" });
+    diagnosticState.image.clickToShareMs = Number((performance.now() - startedAt).toFixed(2));
+    el.testImageShareBtn.disabled = true;
+    renderDiagnostic();
+    settleDiagnosticShare(sharePromise, diagnosticState.image, el.testImageShareBtn);
+  } catch (error) {
+    diagnosticState.image.result = error?.name === "AbortError" ? "user-cancelled" : "share-error";
+    diagnosticState.image.errorName = error?.name || "Error";
+    diagnosticState.image.errorMessage = error?.message || String(error);
+    renderDiagnostic();
+  }
+}
+
 function testDiagnosticBlobDownload() {
   try {
     const { blob } = createDiagnosticPdfBundle();
@@ -460,12 +544,20 @@ function initDiagnostics() {
   if (!diagnosticEnabled) return;
   el.diagnosticPanel.hidden = false;
   diagnosticReadyPdfBundle = createDiagnosticPdfBundle();
+  diagnosticReadyImageFile = createDiagnosticImageFile();
   diagnosticState.pdf.readyBeforeClick = Boolean(diagnosticReadyPdfBundle.file);
   diagnosticState.pdf.readyCreatedAt = new Date().toISOString();
+  diagnosticState.image.readyBeforeClick = diagnosticReadyImageFile instanceof File;
+  diagnosticState.image.readyCreatedAt = new Date().toISOString();
   refreshDiagnosticCapabilities(diagnosticReadyPdfBundle);
-  el.refreshDiagnosticBtn.addEventListener("click", () => refreshDiagnosticCapabilities());
+  refreshDiagnosticImageCapabilities(diagnosticReadyImageFile);
+  el.refreshDiagnosticBtn.addEventListener("click", () => {
+    refreshDiagnosticCapabilities();
+    refreshDiagnosticImageCapabilities();
+  });
   el.testUrlShareBtn.addEventListener("click", testDiagnosticUrlShare);
   el.testPdfShareBtn.addEventListener("click", testDiagnosticPdfShare);
+  el.testImageShareBtn.addEventListener("click", testDiagnosticImageShare);
   el.testBlobDownloadBtn.addEventListener("click", testDiagnosticBlobDownload);
   el.testBlobOpenBtn.addEventListener("click", testDiagnosticBlobOpen);
   el.copyDiagnosticBtn.addEventListener("click", async () => {
