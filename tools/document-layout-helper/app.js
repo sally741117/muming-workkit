@@ -42,6 +42,7 @@ const el = {
   diagnosticPanel: document.querySelector("#diagnosticPanel"),
   diagnosticOutput: document.querySelector("#diagnosticOutput"),
   refreshDiagnosticBtn: document.querySelector("#refreshDiagnosticBtn"),
+  testUrlShareBtn: document.querySelector("#testUrlShareBtn"),
   testPdfShareBtn: document.querySelector("#testPdfShareBtn"),
   testBlobDownloadBtn: document.querySelector("#testBlobDownloadBtn"),
   testBlobOpenBtn: document.querySelector("#testBlobOpenBtn"),
@@ -153,10 +154,19 @@ async function copyText(text) {
 
 
 const diagnosticEnabled = new URLSearchParams(window.location.search).get("debug") === "1";
+let diagnosticReadyPdfBundle = null;
 const diagnosticState = {
   inputs: {
     gallery: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 },
     pdf: { pickerRequested: false, changeEvent: false, fileReceived: false, type: "", size: 0 }
+  },
+  urlShare: {
+    result: "not-tested",
+    activationIsActive: null,
+    activationHasBeenActive: null,
+    clickToShareMs: null,
+    errorName: "",
+    errorMessage: ""
   },
   pdf: {
     blobCreated: false,
@@ -172,13 +182,46 @@ const diagnosticState = {
     canShareUrl: null,
     canShareUrlErrorName: "",
     canShareUrlErrorMessage: "",
+    readyBeforeClick: false,
+    readyCreatedAt: "",
+    shareActivationIsActive: null,
+    shareActivationHasBeenActive: null,
+    clickToShareMs: null,
     shareResult: "not-tested",
     shareErrorName: "",
     shareErrorMessage: "",
     blobDownload: "not-tested",
     blobOpen: "not-tested"
+  },
+  formalShare: {
+    result: "not-tested",
+    cacheReadyAtClick: null,
+    activationAtClickIsActive: null,
+    activationAtClickHasBeenActive: null,
+    activationBeforeShareIsActive: null,
+    activationBeforeShareHasBeenActive: null,
+    clickToShareMs: null,
+    errorName: "",
+    errorMessage: ""
   }
 };
+
+function userActivationSnapshot() {
+  return {
+    isActive: navigator.userActivation?.isActive ?? null,
+    hasBeenActive: navigator.userActivation?.hasBeenActive ?? null
+  };
+}
+
+function webSharePolicyAllowed() {
+  const policy = document.permissionsPolicy || document.featurePolicy;
+  if (typeof policy?.allowsFeature !== "function") return null;
+  try {
+    return policy.allowsFeature("web-share");
+  } catch (_) {
+    return null;
+  }
+}
 
 function createDiagnosticPdfBundle() {
   const { jsPDF } = window.jspdf;
@@ -204,13 +247,17 @@ function diagnosticSnapshot() {
       secureContext: window.isSecureContext,
       navigatorShare: typeof navigator.share === "function",
       navigatorCanShare: typeof navigator.canShare === "function",
+      userActivation: userActivationSnapshot(),
+      webSharePolicyAllowed: webSharePolicyAllowed(),
       inAppBrowser: inApp?.id || false,
       isLineInAppBrowser: inApp?.id === "line",
       isAndroid: /Android/i.test(navigator.userAgent),
       isIOS: /iPad|iPhone|iPod/i.test(navigator.userAgent)
         || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
     },
+    urlShare: { ...diagnosticState.urlShare },
     pdf: { ...diagnosticState.pdf },
+    formalShare: { ...diagnosticState.formalShare },
     fileInputs: {
       gallery: { ...diagnosticState.inputs.gallery },
       pdf: { ...diagnosticState.inputs.pdf }
@@ -226,7 +273,7 @@ function renderDiagnostic() {
 function refreshDiagnosticCapabilities(bundle = null) {
   if (!diagnosticEnabled) return;
   try {
-    const { blob, file } = bundle || createDiagnosticPdfBundle();
+    const { blob, file } = bundle || diagnosticReadyPdfBundle || createDiagnosticPdfBundle();
     diagnosticState.pdf.blobCreated = blob instanceof Blob;
     diagnosticState.pdf.blobType = blob.type;
     diagnosticState.pdf.blobSize = blob.size;
@@ -268,34 +315,96 @@ function refreshDiagnosticCapabilities(bundle = null) {
   renderDiagnostic();
 }
 
-async function testDiagnosticPdfShare() {
-  if (el.testPdfShareBtn.disabled) return;
-  el.testPdfShareBtn.disabled = true;
-  const originalLabel = el.testPdfShareBtn.textContent;
-  el.testPdfShareBtn.textContent = "測試中…";
+function settleDiagnosticShare(promise, target, button) {
+  promise.then(() => {
+    target.result = "share-sheet-completed";
+    target.errorName = "";
+    target.errorMessage = "";
+  }).catch((error) => {
+    target.result = error?.name === "AbortError" ? "user-cancelled" : "share-error";
+    target.errorName = error?.name || "Error";
+    target.errorMessage = error?.message || String(error);
+  }).finally(() => {
+    button.disabled = false;
+    renderDiagnostic();
+  });
+}
+
+function testDiagnosticUrlShare() {
+  if (el.testUrlShareBtn.disabled) return;
+  const startedAt = performance.now();
+  const activation = userActivationSnapshot();
+  Object.assign(diagnosticState.urlShare, {
+    result: "calling-share",
+    activationIsActive: activation.isActive,
+    activationHasBeenActive: activation.hasBeenActive,
+    clickToShareMs: null,
+    errorName: "",
+    errorMessage: ""
+  });
   try {
-    const bundle = createDiagnosticPdfBundle();
-    const { file } = bundle;
-    refreshDiagnosticCapabilities(bundle);
+    if (typeof navigator.share !== "function") {
+      diagnosticState.urlShare.result = "navigator.share-missing";
+      renderDiagnostic();
+      return;
+    }
+    const sharePromise = navigator.share({
+      title: "MUMING Share Test",
+      url: window.location.href
+    });
+    diagnosticState.urlShare.clickToShareMs = Number((performance.now() - startedAt).toFixed(2));
+    el.testUrlShareBtn.disabled = true;
+    renderDiagnostic();
+    settleDiagnosticShare(sharePromise, diagnosticState.urlShare, el.testUrlShareBtn);
+  } catch (error) {
+    diagnosticState.urlShare.result = "share-error";
+    diagnosticState.urlShare.errorName = error?.name || "Error";
+    diagnosticState.urlShare.errorMessage = error?.message || String(error);
+    renderDiagnostic();
+  }
+}
+
+function testDiagnosticPdfShare() {
+  if (el.testPdfShareBtn.disabled) return;
+  const startedAt = performance.now();
+  const activation = userActivationSnapshot();
+  const file = diagnosticReadyPdfBundle?.file || null;
+  Object.assign(diagnosticState.pdf, {
+    readyBeforeClick: Boolean(file),
+    shareActivationIsActive: activation.isActive,
+    shareActivationHasBeenActive: activation.hasBeenActive,
+    clickToShareMs: null,
+    shareResult: "calling-share",
+    shareErrorName: "",
+    shareErrorMessage: ""
+  });
+  try {
     if (typeof navigator.share !== "function") {
       diagnosticState.pdf.shareResult = "navigator.share-missing";
+      renderDiagnostic();
       return;
     }
     if (!file || typeof navigator.canShare !== "function" || !navigator.canShare({ files: [file] })) {
       diagnosticState.pdf.shareResult = "file-share-not-supported";
+      renderDiagnostic();
       return;
     }
-    await navigator.share({ files: [file], title: "MUMING PDF Share Test" });
-    diagnosticState.pdf.shareResult = "share-sheet-completed";
-    diagnosticState.pdf.shareErrorName = "";
-    diagnosticState.pdf.shareErrorMessage = "";
+    const sharePromise = navigator.share({ files: [file], title: "MUMING PDF Share Test" });
+    diagnosticState.pdf.clickToShareMs = Number((performance.now() - startedAt).toFixed(2));
+    el.testPdfShareBtn.disabled = true;
+    renderDiagnostic();
+    settleDiagnosticShare(sharePromise, {
+      get result() { return diagnosticState.pdf.shareResult; },
+      set result(value) { diagnosticState.pdf.shareResult = value; },
+      get errorName() { return diagnosticState.pdf.shareErrorName; },
+      set errorName(value) { diagnosticState.pdf.shareErrorName = value; },
+      get errorMessage() { return diagnosticState.pdf.shareErrorMessage; },
+      set errorMessage(value) { diagnosticState.pdf.shareErrorMessage = value; }
+    }, el.testPdfShareBtn);
   } catch (error) {
     diagnosticState.pdf.shareResult = error?.name === "AbortError" ? "user-cancelled" : "share-error";
     diagnosticState.pdf.shareErrorName = error?.name || "Error";
     diagnosticState.pdf.shareErrorMessage = error?.message || String(error);
-  } finally {
-    el.testPdfShareBtn.disabled = false;
-    el.testPdfShareBtn.textContent = originalLabel;
     renderDiagnostic();
   }
 }
@@ -350,9 +459,13 @@ function recordDiagnosticInput(kind, files) {
 function initDiagnostics() {
   if (!diagnosticEnabled) return;
   el.diagnosticPanel.hidden = false;
-  refreshDiagnosticCapabilities();
+  diagnosticReadyPdfBundle = createDiagnosticPdfBundle();
+  diagnosticState.pdf.readyBeforeClick = Boolean(diagnosticReadyPdfBundle.file);
+  diagnosticState.pdf.readyCreatedAt = new Date().toISOString();
+  refreshDiagnosticCapabilities(diagnosticReadyPdfBundle);
   el.refreshDiagnosticBtn.addEventListener("click", () => refreshDiagnosticCapabilities());
-  el.testPdfShareBtn.addEventListener("click", () => void testDiagnosticPdfShare());
+  el.testUrlShareBtn.addEventListener("click", testDiagnosticUrlShare);
+  el.testPdfShareBtn.addEventListener("click", testDiagnosticPdfShare);
   el.testBlobDownloadBtn.addEventListener("click", testDiagnosticBlobDownload);
   el.testBlobOpenBtn.addEventListener("click", testDiagnosticBlobOpen);
   el.copyDiagnosticBtn.addEventListener("click", async () => {
@@ -2452,6 +2565,22 @@ function generatePdf(caseId) {
 
 async function sharePdf(caseId, button) {
   if (button?.disabled) return;
+  const shareStartedAt = performance.now();
+  if (diagnosticEnabled) {
+    const activation = userActivationSnapshot();
+    Object.assign(diagnosticState.formalShare, {
+      result: "preparing",
+      cacheReadyAtClick: state.pdfCache.has(caseId),
+      activationAtClickIsActive: activation.isActive,
+      activationAtClickHasBeenActive: activation.hasBeenActive,
+      activationBeforeShareIsActive: null,
+      activationBeforeShareHasBeenActive: null,
+      clickToShareMs: null,
+      errorName: "",
+      errorMessage: ""
+    });
+    renderDiagnostic();
+  }
   const originalLabel = button?.textContent || "分享 PDF";
   if (button) {
     button.disabled = true;
@@ -2482,17 +2611,40 @@ async function sharePdf(caseId, button) {
       console.warn("PDF file sharing capability check failed.", error);
     }
     if (!canShareFiles) {
+      if (diagnosticEnabled) {
+        diagnosticState.formalShare.result = "file-share-not-supported";
+        renderDiagnostic();
+      }
       downloadPdf(bundle);
       const message = "此瀏覽器不支援直接分享，已改為下載 PDF。";
       showToast(message);
       return;
     }
-    await navigator.share({
+    if (diagnosticEnabled) {
+      const activation = userActivationSnapshot();
+      diagnosticState.formalShare.activationBeforeShareIsActive = activation.isActive;
+      diagnosticState.formalShare.activationBeforeShareHasBeenActive = activation.hasBeenActive;
+      diagnosticState.formalShare.clickToShareMs = Number((performance.now() - shareStartedAt).toFixed(2));
+      diagnosticState.formalShare.result = "calling-share";
+    }
+    const sharePromise = navigator.share({
       files: shareData.files,
       title: shareData.title,
       text: shareData.text
     });
+    renderDiagnostic();
+    await sharePromise;
+    if (diagnosticEnabled) {
+      diagnosticState.formalShare.result = "share-sheet-completed";
+      renderDiagnostic();
+    }
   } catch (error) {
+    if (diagnosticEnabled) {
+      diagnosticState.formalShare.result = error?.name === "AbortError" ? "user-cancelled" : "share-error";
+      diagnosticState.formalShare.errorName = error?.name || "Error";
+      diagnosticState.formalShare.errorMessage = error?.message || String(error);
+      renderDiagnostic();
+    }
     if (error?.name === "AbortError") return;
     console.error("PDF share failed.", error);
     if (bundle) downloadPdf(bundle);

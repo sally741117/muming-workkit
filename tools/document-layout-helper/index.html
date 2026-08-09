@@ -34,13 +34,14 @@
       <div class="panel-head">
         <div>
           <h2 id="diagnosticTitle">Android 能力診斷</h2>
-          <p>只記錄瀏覽器能力與錯誤，不包含證件或 PDF 內容。</p>
+          <p>依序測試立即分享網址與預建 PDF；只記錄能力與錯誤，不包含證件內容。</p>
         </div>
         <button id="refreshDiagnosticBtn" type="button">重新檢測</button>
       </div>
       <pre id="diagnosticOutput" class="diagnostic-output" aria-live="polite"></pre>
       <div class="diagnostic-actions">
-        <button id="testPdfShareBtn" class="primary" type="button">測試 PDF 分享</button>
+        <button id="testUrlShareBtn" class="primary" type="button">立即分享網址</button>
+        <button id="testPdfShareBtn" class="primary" type="button">立即分享預建 PDF</button>
         <button id="testBlobDownloadBtn" type="button">測試 Blob 下載</button>
         <button id="testBlobOpenBtn" type="button">測試開啟 Blob PDF</button>
         <button id="copyDiagnosticBtn" type="button">複製診斷結果</button>
@@ -188,6 +189,6 @@
   <input id="slotPdfInput" type="file" accept="application/pdf,.pdf" hidden>
   <input id="slotMixedInput" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" hidden>
 
-  <script src="./app.js?v=20260809-6"></script>
+  <script src="./app.js?v=20260809-7"></script>
 </body>
 </html>
