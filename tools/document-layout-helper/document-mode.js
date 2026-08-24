@@ -29,7 +29,8 @@
     pdfBundle: null,
     pdfWarmTimer: null,
     pdfWarmIdle: null,
-    layoutGesture: null
+    layoutGesture: null,
+    layoutScrollY: 0
   };
 
   const documentEl = {
@@ -48,6 +49,8 @@
     pageItems: document.querySelector("#documentPageItems"),
     emptyPageAction: document.querySelector("#documentEmptyPageAction"),
     pageTabs: document.querySelector("#documentPageTabs"),
+    previousPageBtn: document.querySelector("#documentPreviousPageBtn"),
+    nextPageBtn: document.querySelector("#documentNextPageBtn"),
     addPageBtn: document.querySelector("#documentAddPageBtn"),
     deletePageBtn: document.querySelector("#documentDeletePageBtn"),
     statusLog: document.querySelector("#documentStatusLog"),
@@ -58,6 +61,8 @@
     selectedStatus: document.querySelector("#documentSelectedStatus"),
     widthCm: document.querySelector("#documentWidthCm"),
     heightCm: document.querySelector("#documentHeightCm"),
+    leftCm: document.querySelector("#documentLeftCm"),
+    topCm: document.querySelector("#documentTopCm"),
     lockRatio: document.querySelector("#documentLockRatio"),
     pdfBtn: document.querySelector("#documentPdfBtn"),
     sharePdfBtn: document.querySelector("#documentSharePdfBtn"),
@@ -81,10 +86,10 @@
   };
 
   const HANDLE_LABELS = ["左上角", "右上角", "右下角", "左下角"];
-  const A4_WIDTH_CM = 21;
-  const A4_HEIGHT_CM = 29.7;
-  const DEFAULT_DOCUMENT_WIDTH_CM = 17.5;
-  const DEFAULT_DOCUMENT_HEIGHT_CM = 24.8;
+  const A4_WIDTH_MM = 210;
+  const A4_HEIGHT_MM = 297;
+  const DEFAULT_DOCUMENT_WIDTH_MM = 175;
+  const DEFAULT_DOCUMENT_HEIGHT_MM = 248;
 
   function documentUid() {
     return `document-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
@@ -641,13 +646,13 @@
         const normalized = normalizedDocumentPoints(points, sourceCanvas.width, sourceCanvas.height);
         const page = ensureDocumentPage();
         const correctedRatio = currentCanvas.width / Math.max(1, currentCanvas.height);
-        let layoutWidthCm = DEFAULT_DOCUMENT_WIDTH_CM;
-        let layoutHeightCm = layoutWidthCm / correctedRatio;
-        if (layoutHeightCm > DEFAULT_DOCUMENT_HEIGHT_CM) {
-          layoutHeightCm = DEFAULT_DOCUMENT_HEIGHT_CM;
-          layoutWidthCm = layoutHeightCm * correctedRatio;
+        let layoutWidthMm = DEFAULT_DOCUMENT_WIDTH_MM;
+        let layoutHeightMm = layoutWidthMm / correctedRatio;
+        if (layoutHeightMm > DEFAULT_DOCUMENT_HEIGHT_MM) {
+          layoutHeightMm = DEFAULT_DOCUMENT_HEIGHT_MM;
+          layoutWidthMm = layoutHeightMm * correctedRatio;
         }
-        const cascadeOffset = (page.documents.length % 5) * 0.45;
+        const cascadeOffset = (page.documents.length % 5) * 4.5;
         const item = {
           id: documentUid(),
           name: file.name,
@@ -666,10 +671,10 @@
           manuallyAdjusted: false,
           status: best ? "已自動裁切" : "建議手動調整",
           layout: {
-            xCm: Math.min(A4_WIDTH_CM - layoutWidthCm, Math.max(0, (A4_WIDTH_CM - layoutWidthCm) / 2 + cascadeOffset)),
-            yCm: Math.min(A4_HEIGHT_CM - layoutHeightCm, Math.max(0, (A4_HEIGHT_CM - layoutHeightCm) / 2 + cascadeOffset)),
-            widthCm: layoutWidthCm,
-            heightCm: layoutHeightCm,
+            xMm: Math.min(A4_WIDTH_MM - layoutWidthMm, Math.max(0, (A4_WIDTH_MM - layoutWidthMm) / 2 + cascadeOffset)),
+            yMm: Math.min(A4_HEIGHT_MM - layoutHeightMm, Math.max(0, (A4_HEIGHT_MM - layoutHeightMm) / 2 + cascadeOffset)),
+            widthMm: layoutWidthMm,
+            heightMm: layoutHeightMm,
             lockRatio: true
           }
         };
@@ -705,17 +710,21 @@
       return `
         <div class="document-layout-item ${selected ? "selected" : ""}" data-document-id="${item.id}"
           role="button" tabindex="0" aria-label="文件 ${index + 1}：${escapeDocumentHtml(item.name)}"
-          style="left:${layout.xCm / A4_WIDTH_CM * 100}%;top:${layout.yCm / A4_HEIGHT_CM * 100}%;width:${layout.widthCm / A4_WIDTH_CM * 100}%;height:${layout.heightCm / A4_HEIGHT_CM * 100}%">
+          style="left:${layout.xMm / A4_WIDTH_MM * 100}%;top:${layout.yMm / A4_HEIGHT_MM * 100}%;width:${layout.widthMm / A4_WIDTH_MM * 100}%;height:${layout.heightMm / A4_HEIGHT_MM * 100}%">
           <img src="${item.currentDataUrl}" alt="${escapeDocumentHtml(item.name)}">
           <span class="document-layout-item-label">文件 ${index + 1}</span>
-          <span class="document-resize-handle right" data-layout-resize="right" aria-hidden="true"></span>
-          <span class="document-resize-handle bottom" data-layout-resize="bottom" aria-hidden="true"></span>
-          <span class="document-resize-handle corner" data-layout-resize="corner" aria-hidden="true"></span>
+          <span class="document-resize-handle nw" data-layout-resize="nw" aria-hidden="true"></span>
+          <span class="document-resize-handle ne" data-layout-resize="ne" aria-hidden="true"></span>
+          <span class="document-resize-handle se" data-layout-resize="se" aria-hidden="true"></span>
+          <span class="document-resize-handle sw" data-layout-resize="sw" aria-hidden="true"></span>
         </div>
       `;
     }).join("");
     documentEl.emptyPageAction.hidden = page.documents.length > 0;
     documentEl.deletePageBtn.disabled = documentState.pages.length <= 1;
+    const activePageIndex = documentState.pages.indexOf(page);
+    documentEl.previousPageBtn.disabled = activePageIndex <= 0;
+    documentEl.nextPageBtn.disabled = activePageIndex >= documentState.pages.length - 1;
     renderDocumentInspector();
     const hasDocuments = allDocumentItems().length > 0;
     documentEl.pdfBtn.disabled = !hasDocuments;
@@ -732,8 +741,10 @@
     documentEl.selectedName.textContent = selected.name;
     documentEl.selectedStatus.textContent = selected.status;
     documentEl.selectedStatus.classList.toggle("warn", !(selected.autoDetected || selected.manuallyAdjusted));
-    documentEl.widthCm.value = selected.layout.widthCm.toFixed(1);
-    documentEl.heightCm.value = selected.layout.heightCm.toFixed(1);
+    documentEl.widthCm.value = (selected.layout.widthMm / 10).toFixed(1);
+    documentEl.heightCm.value = (selected.layout.heightMm / 10).toFixed(1);
+    documentEl.leftCm.value = (selected.layout.xMm / 10).toFixed(1);
+    documentEl.topCm.value = (selected.layout.yMm / 10).toFixed(1);
     documentEl.lockRatio.checked = selected.layout.lockRatio;
   }
 
@@ -769,7 +780,7 @@
     item.currentCanvas = warpDocumentCanvas(rotated, points);
     item.currentDataUrl = item.currentCanvas.toDataURL("image/jpeg", 0.94);
     if (item.layout?.lockRatio) {
-      item.layout.heightCm = item.layout.widthCm / (item.currentCanvas.width / Math.max(1, item.currentCanvas.height));
+      item.layout.heightMm = item.layout.widthMm / (item.currentCanvas.width / Math.max(1, item.currentCanvas.height));
       clampDocumentLayout(item);
     }
     invalidateDocumentPdf();
@@ -799,32 +810,43 @@
     renderDocumentEditor();
   }
 
-  function clampDocumentLayout(item) {
+  function clampDocumentLayout(item, preserveRatio = false) {
     const layout = item.layout;
-    layout.widthCm = Math.min(A4_WIDTH_CM, Math.max(1, layout.widthCm));
-    layout.heightCm = Math.min(A4_HEIGHT_CM, Math.max(1, layout.heightCm));
-    layout.xCm = Math.min(A4_WIDTH_CM - layout.widthCm, Math.max(0, layout.xCm));
-    layout.yCm = Math.min(A4_HEIGHT_CM - layout.heightCm, Math.max(0, layout.yCm));
+    if (preserveRatio) {
+      const width = Math.max(0.01, layout.widthMm);
+      const height = Math.max(0.01, layout.heightMm);
+      const shrinkScale = Math.min(1, A4_WIDTH_MM / width, A4_HEIGHT_MM / height);
+      layout.widthMm = width * shrinkScale;
+      layout.heightMm = height * shrinkScale;
+      const growScale = Math.max(1, 10 / layout.widthMm, 10 / layout.heightMm);
+      layout.widthMm = Math.min(A4_WIDTH_MM, layout.widthMm * growScale);
+      layout.heightMm = Math.min(A4_HEIGHT_MM, layout.heightMm * growScale);
+    } else {
+      layout.widthMm = Math.min(A4_WIDTH_MM, Math.max(10, layout.widthMm));
+      layout.heightMm = Math.min(A4_HEIGHT_MM, Math.max(10, layout.heightMm));
+    }
+    layout.xMm = Math.min(A4_WIDTH_MM - layout.widthMm, Math.max(0, layout.xMm));
+    layout.yMm = Math.min(A4_HEIGHT_MM - layout.heightMm, Math.max(0, layout.yMm));
   }
 
   function updateDocumentLayoutElement(item) {
     const node = documentEl.pageItems.querySelector(`[data-document-id="${item.id}"]`);
     if (!node) return;
-    node.style.left = `${item.layout.xCm / A4_WIDTH_CM * 100}%`;
-    node.style.top = `${item.layout.yCm / A4_HEIGHT_CM * 100}%`;
-    node.style.width = `${item.layout.widthCm / A4_WIDTH_CM * 100}%`;
-    node.style.height = `${item.layout.heightCm / A4_HEIGHT_CM * 100}%`;
+    node.style.left = `${item.layout.xMm / A4_WIDTH_MM * 100}%`;
+    node.style.top = `${item.layout.yMm / A4_HEIGHT_MM * 100}%`;
+    node.style.width = `${item.layout.widthMm / A4_WIDTH_MM * 100}%`;
+    node.style.height = `${item.layout.heightMm / A4_HEIGHT_MM * 100}%`;
     if (item.id === documentState.selectedItemId) renderDocumentInspector();
   }
 
   function rotatePlacedDocument(item, degrees) {
-    const centerX = item.layout.xCm + item.layout.widthCm / 2;
-    const centerY = item.layout.yCm + item.layout.heightCm / 2;
+    const centerX = item.layout.xMm + item.layout.widthMm / 2;
+    const centerY = item.layout.yMm + item.layout.heightMm / 2;
     item.rotation = normalizeDocumentRotation(item.rotation + degrees);
     item.lastAppliedCrop.rotation = item.rotation;
-    [item.layout.widthCm, item.layout.heightCm] = [item.layout.heightCm, item.layout.widthCm];
-    item.layout.xCm = centerX - item.layout.widthCm / 2;
-    item.layout.yCm = centerY - item.layout.heightCm / 2;
+    [item.layout.widthMm, item.layout.heightMm] = [item.layout.heightMm, item.layout.widthMm];
+    item.layout.xMm = centerX - item.layout.widthMm / 2;
+    item.layout.yMm = centerY - item.layout.heightMm / 2;
     item.status = "已旋轉";
     clampDocumentLayout(item);
     refreshDocumentOutput(item);
@@ -847,6 +869,18 @@
     documentState.selectedItemId = null;
     renderDocumentEditor();
   });
+
+  function moveToDocumentPage(offset) {
+    const currentIndex = documentState.pages.findIndex((page) => page.id === documentState.activePageId);
+    const nextIndex = Math.min(documentState.pages.length - 1, Math.max(0, currentIndex + offset));
+    if (nextIndex === currentIndex || nextIndex < 0) return;
+    documentState.activePageId = documentState.pages[nextIndex].id;
+    documentState.selectedItemId = null;
+    renderDocumentEditor();
+  }
+
+  documentEl.previousPageBtn.addEventListener("click", () => moveToDocumentPage(-1));
+  documentEl.nextPageBtn.addEventListener("click", () => moveToDocumentPage(1));
 
   documentEl.addPageBtn.addEventListener("click", () => {
     const page = createDocumentPage();
@@ -882,73 +916,168 @@
     if (itemNode) openDocumentCrop(itemNode.dataset.documentId, itemNode);
   });
 
-  function startDocumentLayoutGesture(event) {
-    const itemNode = event.target.closest("[data-document-id]");
+  function lockDocumentLayoutScroll() {
+    documentState.layoutScrollY = window.scrollY;
+    document.body.style.top = `-${documentState.layoutScrollY}px`;
+    document.body.classList.add("document-layout-dragging");
+  }
+
+  function unlockDocumentLayoutScroll() {
+    if (!document.body.classList.contains("document-layout-dragging")) return;
+    document.body.classList.remove("document-layout-dragging");
+    document.body.style.top = "";
+    window.scrollTo(0, documentState.layoutScrollY);
+  }
+
+  function beginDocumentLayoutGesture(target, clientX, clientY, inputMode, pointerId = null, touchId = null, lockScroll = false) {
+    const itemNode = target.closest("[data-document-id]");
     if (!itemNode || documentState.layoutGesture) return;
     const item = findDocumentItem(itemNode.dataset.documentId).item;
     if (!item) return;
-    event.preventDefault();
-    event.stopPropagation();
     documentState.selectedItemId = item.id;
     documentEl.pageItems.querySelectorAll(".document-layout-item.selected").forEach((node) => node.classList.remove("selected"));
     itemNode.classList.add("selected");
-    const resize = event.target.closest("[data-layout-resize]")?.dataset.layoutResize || "move";
+    const resize = target.closest("[data-layout-resize]")?.dataset.layoutResize || "move";
     documentState.layoutGesture = {
-      pointerId: event.pointerId,
+      inputMode,
+      pointerId,
+      touchId,
       target: itemNode,
       item,
       mode: resize,
-      startX: event.clientX,
-      startY: event.clientY,
+      startX: clientX,
+      startY: clientY,
       startLayout: { ...item.layout },
-      ratio: item.layout.widthCm / Math.max(0.1, item.layout.heightCm),
-      moved: false
+      ratio: item.layout.widthMm / Math.max(1, item.layout.heightMm),
+      moved: false,
+      scrollLocked: lockScroll
     };
-    try { itemNode.setPointerCapture(event.pointerId); } catch (_) { /* Synthetic events do not capture. */ }
+    if (lockScroll) lockDocumentLayoutScroll();
     renderDocumentInspector();
+  }
+
+  function updateDocumentLayoutGestureFromClient(clientX, clientY) {
+    const gesture = documentState.layoutGesture;
+    if (!gesture) return;
+    const pageRect = documentEl.dropZone.getBoundingClientRect();
+    const dx = (clientX - gesture.startX) / Math.max(1, pageRect.width) * A4_WIDTH_MM;
+    const dy = (clientY - gesture.startY) / Math.max(1, pageRect.height) * A4_HEIGHT_MM;
+    if (Math.hypot(clientX - gesture.startX, clientY - gesture.startY) > 3) gesture.moved = true;
+    const layout = gesture.item.layout;
+    if (gesture.mode === "move") {
+      layout.xMm = gesture.startLayout.xMm + dx;
+      layout.yMm = gesture.startLayout.yMm + dy;
+    } else {
+      const fromLeft = gesture.mode === "nw" || gesture.mode === "sw";
+      const fromTop = gesture.mode === "nw" || gesture.mode === "ne";
+      let width = gesture.startLayout.widthMm + (fromLeft ? -dx : dx);
+      let height = gesture.startLayout.heightMm + (fromTop ? -dy : dy);
+      const maxWidth = fromLeft
+        ? gesture.startLayout.xMm + gesture.startLayout.widthMm
+        : A4_WIDTH_MM - gesture.startLayout.xMm;
+      const maxHeight = fromTop
+        ? gesture.startLayout.yMm + gesture.startLayout.heightMm
+        : A4_HEIGHT_MM - gesture.startLayout.yMm;
+      if (layout.lockRatio) {
+        if (Math.abs(dy) > Math.abs(dx)) width = height * gesture.ratio;
+        else height = width / gesture.ratio;
+        const scale = Math.min(1, maxWidth / Math.max(0.01, width), maxHeight / Math.max(0.01, height));
+        width *= scale;
+        height *= scale;
+      } else {
+        width = Math.min(maxWidth, width);
+        height = Math.min(maxHeight, height);
+      }
+      layout.widthMm = width;
+      layout.heightMm = height;
+      if (fromLeft) layout.xMm = gesture.startLayout.xMm + gesture.startLayout.widthMm - width;
+      else layout.xMm = gesture.startLayout.xMm;
+      if (fromTop) layout.yMm = gesture.startLayout.yMm + gesture.startLayout.heightMm - height;
+      else layout.yMm = gesture.startLayout.yMm;
+    }
+    clampDocumentLayout(gesture.item, layout.lockRatio && gesture.mode !== "move");
+    updateDocumentLayoutElement(gesture.item);
+  }
+
+  function finishDocumentLayoutGesture() {
+    const gesture = documentState.layoutGesture;
+    if (!gesture) return;
+    if (gesture.moved) documentState.suppressClickUntil = performance.now() + 450;
+    documentState.layoutGesture = null;
+    if (gesture.scrollLocked) unlockDocumentLayoutScroll();
+    invalidateDocumentPdf();
+    renderDocumentEditor();
+  }
+
+  function startDocumentLayoutGesture(event) {
+    if (!event.target.closest("[data-document-id]")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    beginDocumentLayoutGesture(
+      event.target,
+      event.clientX,
+      event.clientY,
+      "pointer",
+      event.pointerId,
+      null,
+      event.pointerType === "touch"
+    );
+    const gesture = documentState.layoutGesture;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    try { gesture.target.setPointerCapture(event.pointerId); } catch (_) { /* Synthetic events do not capture. */ }
   }
 
   function updateDocumentLayoutGesture(event) {
     const gesture = documentState.layoutGesture;
-    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    if (!gesture || gesture.inputMode !== "pointer" || event.pointerId !== gesture.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
-    const pageRect = documentEl.dropZone.getBoundingClientRect();
-    const dx = (event.clientX - gesture.startX) / Math.max(1, pageRect.width) * A4_WIDTH_CM;
-    const dy = (event.clientY - gesture.startY) / Math.max(1, pageRect.height) * A4_HEIGHT_CM;
-    if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) > 3) gesture.moved = true;
-    const layout = gesture.item.layout;
-    if (gesture.mode === "move") {
-      layout.xCm = gesture.startLayout.xCm + dx;
-      layout.yCm = gesture.startLayout.yCm + dy;
-    } else {
-      let width = gesture.startLayout.widthCm;
-      let height = gesture.startLayout.heightCm;
-      if (gesture.mode === "right" || gesture.mode === "corner") width += dx;
-      if (gesture.mode === "bottom" || gesture.mode === "corner") height += dy;
-      if (layout.lockRatio) {
-        if (gesture.mode === "bottom" || (gesture.mode === "corner" && Math.abs(dy) > Math.abs(dx))) width = height * gesture.ratio;
-        else height = width / gesture.ratio;
-      }
-      layout.widthCm = width;
-      layout.heightCm = height;
-    }
-    clampDocumentLayout(gesture.item);
-    updateDocumentLayoutElement(gesture.item);
+    updateDocumentLayoutGestureFromClient(event.clientX, event.clientY);
   }
 
   function endDocumentLayoutGesture(event) {
     const gesture = documentState.layoutGesture;
-    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    if (!gesture || gesture.inputMode !== "pointer" || event.pointerId !== gesture.pointerId) return;
     event.preventDefault();
-    if (gesture.moved) documentState.suppressClickUntil = performance.now() + 450;
     try {
       if (gesture.target.hasPointerCapture(event.pointerId)) gesture.target.releasePointerCapture(event.pointerId);
     } catch (_) { /* Capture may already be released. */ }
-    documentState.layoutGesture = null;
-    invalidateDocumentPdf();
-    renderDocumentEditor();
+    finishDocumentLayoutGesture();
   }
+
+  function findLayoutTouch(event, touchId) {
+    return [...event.changedTouches, ...event.touches].find((touch) => touch.identifier === touchId) || null;
+  }
+
+  documentEl.pageItems.addEventListener("touchstart", (event) => {
+    const itemNode = event.target.closest("[data-document-id]");
+    if (!itemNode) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (documentState.layoutGesture) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    beginDocumentLayoutGesture(event.target, touch.clientX, touch.clientY, "touch", null, touch.identifier, true);
+  }, { passive: false });
+
+  documentEl.pageItems.addEventListener("touchmove", (event) => {
+    const gesture = documentState.layoutGesture;
+    if (!gesture || gesture.inputMode !== "touch") return;
+    const touch = findLayoutTouch(event, gesture.touchId);
+    if (!touch) return;
+    event.preventDefault();
+    event.stopPropagation();
+    updateDocumentLayoutGestureFromClient(touch.clientX, touch.clientY);
+  }, { passive: false });
+
+  ["touchend", "touchcancel"].forEach((type) => documentEl.pageItems.addEventListener(type, (event) => {
+    const gesture = documentState.layoutGesture;
+    if (!gesture || gesture.inputMode !== "touch") return;
+    if (!findLayoutTouch(event, gesture.touchId)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    finishDocumentLayoutGesture();
+  }, { passive: false }));
 
   documentEl.pageItems.addEventListener("pointerdown", startDocumentLayoutGesture, { passive: false });
   documentEl.pageItems.addEventListener("pointermove", updateDocumentLayoutGesture, { passive: false });
@@ -965,21 +1094,47 @@
       openDocumentCrop(item.id, itemNode);
       return;
     }
-    const delta = event.shiftKey ? 0.5 : 0.1;
+    const delta = event.shiftKey ? 5 : 1;
     if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
     event.preventDefault();
-    if (event.key === "ArrowLeft") item.layout.xCm -= delta;
-    if (event.key === "ArrowRight") item.layout.xCm += delta;
-    if (event.key === "ArrowUp") item.layout.yCm -= delta;
-    if (event.key === "ArrowDown") item.layout.yCm += delta;
-    clampDocumentLayout(item);
+    if (event.key === "ArrowLeft") item.layout.xMm -= delta;
+    if (event.key === "ArrowRight") item.layout.xMm += delta;
+    if (event.key === "ArrowUp") item.layout.yMm -= delta;
+    if (event.key === "ArrowDown") item.layout.yMm += delta;
+    clampDocumentLayout(item, item.layout.lockRatio);
     invalidateDocumentPdf();
     updateDocumentLayoutElement(item);
   });
 
   documentEl.inspector.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-selected-document-action]");
+    const quickLayoutButton = event.target.closest("[data-document-quick-layout]");
     const item = selectedDocumentItem();
+    if (quickLayoutButton && item) {
+      const action = quickLayoutButton.dataset.documentQuickLayout;
+      if (action === "horizontal" || action === "center") item.layout.xMm = (A4_WIDTH_MM - item.layout.widthMm) / 2;
+      if (action === "vertical" || action === "center") item.layout.yMm = (A4_HEIGHT_MM - item.layout.heightMm) / 2;
+      if (action === "fit") {
+        const marginMm = 10;
+        const availableWidth = A4_WIDTH_MM - marginMm * 2;
+        const availableHeight = A4_HEIGHT_MM - marginMm * 2;
+        const ratio = item.currentCanvas.width / Math.max(1, item.currentCanvas.height);
+        let widthMm = availableWidth;
+        let heightMm = widthMm / ratio;
+        if (heightMm > availableHeight) {
+          heightMm = availableHeight;
+          widthMm = heightMm * ratio;
+        }
+        item.layout.widthMm = widthMm;
+        item.layout.heightMm = heightMm;
+        item.layout.xMm = (A4_WIDTH_MM - widthMm) / 2;
+        item.layout.yMm = (A4_HEIGHT_MM - heightMm) / 2;
+      }
+      clampDocumentLayout(item);
+      invalidateDocumentPdf();
+      updateDocumentLayoutElement(item);
+      return;
+    }
+    const button = event.target.closest("[data-selected-document-action]");
     if (!button || !item) return;
     const action = button.dataset.selectedDocumentAction;
     if (action === "crop") openDocumentCrop(item.id, button);
@@ -994,22 +1149,36 @@
     if (!item) return;
     const width = Number(documentEl.widthCm.value);
     const height = Number(documentEl.heightCm.value);
-    const ratio = item.layout.widthCm / Math.max(0.1, item.layout.heightCm);
+    const ratio = item.layout.widthMm / Math.max(1, item.layout.heightMm);
     if (changedAxis === "width" && Number.isFinite(width)) {
-      item.layout.widthCm = width;
-      if (item.layout.lockRatio) item.layout.heightCm = width / ratio;
+      item.layout.widthMm = width * 10;
+      if (item.layout.lockRatio) item.layout.heightMm = item.layout.widthMm / ratio;
     }
     if (changedAxis === "height" && Number.isFinite(height)) {
-      item.layout.heightCm = height;
-      if (item.layout.lockRatio) item.layout.widthCm = height * ratio;
+      item.layout.heightMm = height * 10;
+      if (item.layout.lockRatio) item.layout.widthMm = item.layout.heightMm * ratio;
     }
-    clampDocumentLayout(item);
+    clampDocumentLayout(item, item.layout.lockRatio);
     invalidateDocumentPdf();
     updateDocumentLayoutElement(item);
   }
 
   documentEl.widthCm.addEventListener("input", () => applyDocumentSizeInput("width"));
   documentEl.heightCm.addEventListener("input", () => applyDocumentSizeInput("height"));
+  function applyDocumentPositionInput(axis) {
+    const item = selectedDocumentItem();
+    if (!item) return;
+    const value = Number(axis === "x" ? documentEl.leftCm.value : documentEl.topCm.value);
+    if (!Number.isFinite(value)) return;
+    if (axis === "x") item.layout.xMm = value * 10;
+    else item.layout.yMm = value * 10;
+    clampDocumentLayout(item);
+    invalidateDocumentPdf();
+    updateDocumentLayoutElement(item);
+  }
+
+  documentEl.leftCm.addEventListener("input", () => applyDocumentPositionInput("x"));
+  documentEl.topCm.addEventListener("input", () => applyDocumentPositionInput("y"));
   documentEl.lockRatio.addEventListener("change", () => {
     const item = selectedDocumentItem();
     if (!item) return;
@@ -1400,7 +1569,7 @@
     item.currentCanvas = warpDocumentCanvas(documentEl.cropCanvas, points);
     item.currentDataUrl = item.currentCanvas.toDataURL("image/jpeg", 0.94);
     if (item.layout?.lockRatio) {
-      item.layout.heightCm = item.layout.widthCm / (item.currentCanvas.width / Math.max(1, item.currentCanvas.height));
+      item.layout.heightMm = item.layout.widthMm / (item.currentCanvas.width / Math.max(1, item.currentCanvas.height));
       clampDocumentLayout(item);
     }
     item.manuallyAdjusted = true;
@@ -1526,10 +1695,10 @@
         pdf.addImage(
           item.currentDataUrl,
           "JPEG",
-          item.layout.xCm * 10,
-          item.layout.yCm * 10,
-          item.layout.widthCm * 10,
-          item.layout.heightCm * 10,
+          item.layout.xMm,
+          item.layout.yMm,
+          item.layout.widthMm,
+          item.layout.heightMm,
           undefined,
           "FAST"
         );

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>證件排版小幫手 | MUMING WorkKit</title>
-  <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
+  <title>證件與文件排版小幫手 | MUMING WorkKit</title>
+  <meta name="description" content="證件與紙本文件自動校正、自由排版，一鍵輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
   <link rel="stylesheet" href="./tool.css?v=20260824-2">
   <script src="./vendor/pdf.min.js"></script>
@@ -15,7 +15,7 @@
   <header class="topbar">
     <div>
       <p class="brand"><a class="brand-link" href="../../index.html">MUMING WorkKit</a></p>
-      <h1>證件排版小幫手</h1>
+      <h1>證件與文件排版小幫手</h1>
     </div>
     <p id="privacyNotice" class="privacy">證件僅於本機瀏覽器處理，不會上傳或儲存。</p>
   </header>
@@ -93,7 +93,11 @@
           </div>
 
           <div class="document-page-bar">
-            <div id="documentPageTabs" class="document-page-tabs" aria-label="文件頁面"></div>
+            <div class="document-page-navigation">
+              <button id="documentPreviousPageBtn" type="button" aria-label="上一頁">←</button>
+              <div id="documentPageTabs" class="document-page-tabs" aria-label="文件頁面"></div>
+              <button id="documentNextPageBtn" type="button" aria-label="下一頁">→</button>
+            </div>
             <button id="documentDeletePageBtn" class="danger-quiet" type="button">刪除此頁</button>
           </div>
 
@@ -123,6 +127,12 @@
                   <label>高度
                     <span><input id="documentHeightCm" type="number" min="1" max="29.7" step="0.1" inputmode="decimal"> cm</span>
                   </label>
+                  <label>距左
+                    <span><input id="documentLeftCm" type="number" min="0" max="21" step="0.1" inputmode="decimal"> cm</span>
+                  </label>
+                  <label>距上
+                    <span><input id="documentTopCm" type="number" min="0" max="29.7" step="0.1" inputmode="decimal"> cm</span>
+                  </label>
                   <label class="document-ratio-lock">
                     <input id="documentLockRatio" type="checkbox" checked>
                     鎖定比例
@@ -134,6 +144,12 @@
                   <button type="button" data-selected-document-action="rotate-left">左轉</button>
                   <button type="button" data-selected-document-action="rotate-right">右轉</button>
                   <button class="danger-quiet" type="button" data-selected-document-action="delete">刪除</button>
+                </div>
+                <div class="document-quick-layout" aria-label="快速排版">
+                  <button type="button" data-document-quick-layout="horizontal">水平置中</button>
+                  <button type="button" data-document-quick-layout="vertical">垂直置中</button>
+                  <button type="button" data-document-quick-layout="center">頁面置中</button>
+                  <button type="button" data-document-quick-layout="fit">適合頁面</button>
                 </div>
               </div>
             </aside>

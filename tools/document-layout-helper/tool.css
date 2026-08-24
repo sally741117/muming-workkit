@@ -35,6 +35,16 @@ body.document-crop-modal-open {
   overflow: hidden;
 }
 
+body.document-layout-dragging {
+  position: fixed;
+  right: 0;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
 body.crop-handle-dragging {
   overscroll-behavior: none;
   touch-action: none;
@@ -237,6 +247,19 @@ button:disabled { opacity: .55; cursor: wait; }
   gap: 6px;
 }
 
+.document-page-navigation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.document-page-navigation > button {
+  width: 36px;
+  padding: 0;
+  font-size: 18px;
+}
+
 .document-page-tabs button {
   min-width: 76px;
   background: #fff;
@@ -355,36 +378,36 @@ button:disabled { opacity: .55; cursor: wait; }
   position: absolute;
   z-index: 3;
   display: none;
-  background: #fff;
-  border: 2px solid var(--accent);
+  border: 0;
+  background: transparent;
   touch-action: none;
 }
 
+.document-resize-handle::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: #fff;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
 .document-layout-item.selected .document-resize-handle { display: block; }
-.document-resize-handle.right {
-  top: calc(50% - 9px);
-  right: -9px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  cursor: ew-resize;
+.document-resize-handle.nw,
+.document-resize-handle.ne,
+.document-resize-handle.se,
+.document-resize-handle.sw {
+  width: 24px;
+  height: 24px;
 }
-.document-resize-handle.bottom {
-  bottom: -9px;
-  left: calc(50% - 9px);
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  cursor: ns-resize;
-}
-.document-resize-handle.corner {
-  right: -10px;
-  bottom: -10px;
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  cursor: nwse-resize;
-}
+.document-resize-handle.nw { top: -12px; left: -12px; cursor: nwse-resize; }
+.document-resize-handle.ne { top: -12px; right: -12px; cursor: nesw-resize; }
+.document-resize-handle.se { right: -12px; bottom: -12px; cursor: nwse-resize; }
+.document-resize-handle.sw { bottom: -12px; left: -12px; cursor: nesw-resize; }
 
 .document-inspector {
   position: sticky;
@@ -465,6 +488,21 @@ button:disabled { opacity: .55; cursor: wait; }
   grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin-top: 14px;
+}
+
+.document-quick-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.document-quick-layout button {
+  min-height: 32px;
+  padding: 0 6px;
+  font-size: 11px;
 }
 
 .document-inspector-actions button {
@@ -1000,16 +1038,20 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   .mode-switch button { flex: 1; min-width: 0; }
   .document-editor-panel { padding: 12px; }
   .document-page-bar { align-items: flex-start; }
+  .document-page-navigation { flex: 1; }
   .document-page-tabs { flex: 1; }
   .document-page-tabs button { min-width: 66px; }
   .document-page-viewport { margin: 0 -4px; padding: 10px; }
   .document-empty-page-action { inset: 40% 9% auto; width: 82%; min-height: 54px; font-size: 12px; }
   .document-layout-item-label { display: none; }
-  .document-resize-handle.right,
-  .document-resize-handle.bottom { width: 24px; height: 24px; }
-  .document-resize-handle.right { right: -12px; top: calc(50% - 12px); }
-  .document-resize-handle.bottom { bottom: -12px; left: calc(50% - 12px); }
-  .document-resize-handle.corner { right: -12px; bottom: -12px; width: 26px; height: 26px; }
+  .document-resize-handle.nw,
+  .document-resize-handle.ne,
+  .document-resize-handle.se,
+  .document-resize-handle.sw { width: 44px; height: 44px; }
+  .document-resize-handle.nw { top: -22px; left: -22px; }
+  .document-resize-handle.ne { top: -22px; right: -22px; }
+  .document-resize-handle.se { right: -22px; bottom: -22px; }
+  .document-resize-handle.sw { bottom: -22px; left: -22px; }
   .document-pdf-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .document-pdf-actions .primary { grid-column: span 1; }
 }

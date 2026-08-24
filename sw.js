@@ -1,4 +1,4 @@
-const CACHE_NAME = "muming-workkit-v15";
+const CACHE_NAME = "muming-workkit-v16";
 const CACHE_PREFIX = "muming-workkit-";
 
 const HTML_ASSETS = [
@@ -32,6 +32,7 @@ const STATIC_ASSETS = [
   "./tools/project-quote-helper/tool.js",
   "./tools/document-layout-helper/tool.css",
   "./tools/document-layout-helper/app.js",
+  "./tools/document-layout-helper/document-mode.js",
   "./tools/document-layout-helper/vendor/pdf.min.js",
   "./tools/document-layout-helper/vendor/pdf.worker.min.js",
   "./tools/document-layout-helper/vendor/opencv.js",

@@ -48,8 +48,8 @@
   {
     tool_id: "document-layout-helper",
     pack_id: "foreign-workforce",
-    name: "證件排版小幫手",
-    description: "身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。",
+    name: "證件與文件排版小幫手",
+    description: "證件與紙本文件自動校正、自由排版，一鍵輸出 PDF。",
     category: "文件與證件",
     category_id: "document",
     category_label: "文件與證件",
@@ -61,8 +61,8 @@
     free: true,
     is_free: true,
     url: "tools/document-layout-helper/",
-    keywords: ["身分證", "證件", "居留證", "ARC", "裁切證件", "證件排版", "身分證排版", "列印身分證", "PDF", "證件影本", "文件排版", "文件", "裁切", "排版"],
-    tags: ["文件", "證件", "外籍移工"],
+    keywords: ["身分證", "居留證", "證件", "文件", "文件排版", "文件掃描", "A4", "PDF", "裁切", "拉正", "透視校正", "Word 排版", "ARC", "裁切證件", "證件排版", "身分證排版", "列印身分證", "證件影本", "排版"],
+    tags: ["文件", "證件", "外籍移工", "A4", "PDF"],
     icon: "證",
     type: "document",
     estimated_time: "3-8 分鐘",
@@ -70,7 +70,7 @@
     featured: true,
     popularity: 96,
     created_at: "2026-08-08",
-    updated_at: "2026-08-08"
+    updated_at: "2026-08-24"
   },
   {
     tool_id: "admin-message",
