@@ -6,7 +6,7 @@
   <title>證件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260824-1">
+  <link rel="stylesheet" href="./tool.css?v=20260824-2">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -84,56 +84,66 @@
       </section>
 
       <section class="document-workspace">
-        <section class="panel document-panel">
+        <section class="panel document-editor-panel">
           <div class="panel-head">
             <div>
-              <h2>文件清單</h2>
+              <h2>A4 文件排版</h2>
               <p id="documentEngineStatus" class="engine">影像引擎載入中...</p>
             </div>
-            <div class="document-import-actions">
-              <button id="documentSelectBtn" class="primary" type="button">選擇圖片</button>
-              <button id="documentCameraBtn" type="button">直接拍照</button>
-            </div>
           </div>
-          <div id="documentDropZone" class="document-drop-zone" role="button" tabindex="0">
-            拖入多張文件照片，或點擊選擇圖片
-          </div>
-          <div id="documentStatusLog" class="status-log" aria-live="polite"></div>
-          <div id="documentList" class="document-list empty"></div>
-        </section>
 
-        <section class="panel document-layout-panel" aria-labelledby="documentLayoutTitle">
-          <div class="panel-head">
-            <div>
-              <h2 id="documentLayoutTitle">PDF 版面</h2>
-              <p class="engine">每張文件輸出為一頁，可合併成多頁 PDF。</p>
+          <div class="document-page-bar">
+            <div id="documentPageTabs" class="document-page-tabs" aria-label="文件頁面"></div>
+            <button id="documentDeletePageBtn" class="danger-quiet" type="button">刪除此頁</button>
+          </div>
+
+          <div class="document-editor-grid">
+            <div id="documentPageViewport" class="document-page-viewport">
+              <div id="documentDropZone" class="document-a4-page" role="region" aria-label="目前 A4 頁面">
+                <div id="documentPageItems" class="document-page-items"></div>
+                <button id="documentEmptyPageAction" class="document-empty-page-action" type="button">
+                  點擊新增文件，或拖入多張圖片
+                </button>
+              </div>
             </div>
+
+            <aside id="documentInspector" class="document-inspector" aria-label="文件設定">
+              <div id="documentNoSelection" class="document-no-selection">
+                點選頁面中的文件即可調整尺寸與裁切。
+              </div>
+              <div id="documentSelectionControls" hidden>
+                <div class="document-inspector-head">
+                  <strong id="documentSelectedName">文件</strong>
+                  <span id="documentSelectedStatus" class="document-status"></span>
+                </div>
+                <div class="document-size-controls">
+                  <label>寬度
+                    <span><input id="documentWidthCm" type="number" min="1" max="21" step="0.1" inputmode="decimal"> cm</span>
+                  </label>
+                  <label>高度
+                    <span><input id="documentHeightCm" type="number" min="1" max="29.7" step="0.1" inputmode="decimal"> cm</span>
+                  </label>
+                  <label class="document-ratio-lock">
+                    <input id="documentLockRatio" type="checkbox" checked>
+                    鎖定比例
+                  </label>
+                </div>
+                <div class="document-inspector-actions">
+                  <button type="button" data-selected-document-action="crop">調整裁切</button>
+                  <button type="button" data-selected-document-action="redetect">重新自動裁切</button>
+                  <button type="button" data-selected-document-action="rotate-left">左轉</button>
+                  <button type="button" data-selected-document-action="rotate-right">右轉</button>
+                  <button class="danger-quiet" type="button" data-selected-document-action="delete">刪除</button>
+                </div>
+              </div>
+            </aside>
           </div>
-          <div class="document-layout-controls">
-            <label>紙張方向
-              <select id="documentOrientation">
-                <option value="portrait">A4 直式</option>
-                <option value="landscape">A4 橫式</option>
-              </select>
-            </label>
-            <label>圖片配置
-              <select id="documentFitMode">
-                <option value="contain">原比例置中</option>
-                <option value="width">放大至頁寬</option>
-                <option value="height">放大至頁高</option>
-                <option value="cover">滿版鋪滿</option>
-              </select>
-            </label>
-            <label>頁面留白
-              <select id="documentMargin">
-                <option value="0">無留白</option>
-                <option value="5" selected>5 mm</option>
-                <option value="10">10 mm</option>
-                <option value="15">15 mm</option>
-              </select>
-            </label>
-          </div>
+
+          <div id="documentStatusLog" class="status-log" aria-live="polite"></div>
           <div class="document-pdf-actions">
+            <button id="documentSelectBtn" type="button">新增文件</button>
+            <button id="documentCameraBtn" type="button">直接拍照</button>
+            <button id="documentAddPageBtn" type="button">新增頁面</button>
             <button id="documentPdfBtn" class="primary" type="button">產生 PDF</button>
             <button id="documentSharePdfBtn" type="button">分享 PDF</button>
           </div>
@@ -312,6 +322,6 @@
   <input id="documentCameraInput" type="file" accept="image/*" capture="environment" hidden>
 
   <script src="./app.js?v=20260809-13"></script>
-  <script src="./document-mode.js?v=20260824-1"></script>
+  <script src="./document-mode.js?v=20260824-2"></script>
 </body>
 </html>

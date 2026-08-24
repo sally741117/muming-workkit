@@ -3,7 +3,9 @@
 
   const documentState = {
     mode: "identity",
-    documents: [],
+    pages: [],
+    activePageId: null,
+    selectedItemId: null,
     cvReady: false,
     activeId: null,
     cropPoints: [],
@@ -25,7 +27,9 @@
     dragMoved: false,
     suppressClickUntil: 0,
     pdfBundle: null,
-    pdfWarmTimer: null
+    pdfWarmTimer: null,
+    pdfWarmIdle: null,
+    layoutGesture: null
   };
 
   const documentEl = {
@@ -40,11 +44,21 @@
     imageInput: document.querySelector("#documentImageInput"),
     cameraInput: document.querySelector("#documentCameraInput"),
     dropZone: document.querySelector("#documentDropZone"),
+    pageViewport: document.querySelector("#documentPageViewport"),
+    pageItems: document.querySelector("#documentPageItems"),
+    emptyPageAction: document.querySelector("#documentEmptyPageAction"),
+    pageTabs: document.querySelector("#documentPageTabs"),
+    addPageBtn: document.querySelector("#documentAddPageBtn"),
+    deletePageBtn: document.querySelector("#documentDeletePageBtn"),
     statusLog: document.querySelector("#documentStatusLog"),
-    list: document.querySelector("#documentList"),
-    orientation: document.querySelector("#documentOrientation"),
-    fitMode: document.querySelector("#documentFitMode"),
-    margin: document.querySelector("#documentMargin"),
+    inspector: document.querySelector("#documentInspector"),
+    noSelection: document.querySelector("#documentNoSelection"),
+    selectionControls: document.querySelector("#documentSelectionControls"),
+    selectedName: document.querySelector("#documentSelectedName"),
+    selectedStatus: document.querySelector("#documentSelectedStatus"),
+    widthCm: document.querySelector("#documentWidthCm"),
+    heightCm: document.querySelector("#documentHeightCm"),
+    lockRatio: document.querySelector("#documentLockRatio"),
     pdfBtn: document.querySelector("#documentPdfBtn"),
     sharePdfBtn: document.querySelector("#documentSharePdfBtn"),
     cropDialog: document.querySelector("#documentCropDialog"),
@@ -67,9 +81,46 @@
   };
 
   const HANDLE_LABELS = ["左上角", "右上角", "右下角", "左下角"];
+  const A4_WIDTH_CM = 21;
+  const A4_HEIGHT_CM = 29.7;
+  const DEFAULT_DOCUMENT_WIDTH_CM = 17.5;
+  const DEFAULT_DOCUMENT_HEIGHT_CM = 24.8;
 
   function documentUid() {
     return `document-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+  }
+
+  function createDocumentPage() {
+    return { id: documentUid(), documents: [] };
+  }
+
+  function ensureDocumentPage() {
+    if (!documentState.pages.length) {
+      const page = createDocumentPage();
+      documentState.pages.push(page);
+      documentState.activePageId = page.id;
+    }
+    return activeDocumentPage();
+  }
+
+  function activeDocumentPage() {
+    return documentState.pages.find((page) => page.id === documentState.activePageId) || documentState.pages[0] || null;
+  }
+
+  function allDocumentItems() {
+    return documentState.pages.flatMap((page) => page.documents);
+  }
+
+  function findDocumentItem(itemId) {
+    for (const page of documentState.pages) {
+      const item = page.documents.find((documentItem) => documentItem.id === itemId);
+      if (item) return { page, item };
+    }
+    return { page: null, item: null };
+  }
+
+  function selectedDocumentItem() {
+    return findDocumentItem(documentState.selectedItemId).item;
   }
 
   function documentLog(message) {
@@ -106,7 +157,7 @@
     documentEl.privacyNotice.textContent = isDocument
       ? "文件僅於本機瀏覽器處理，不會上傳或儲存。"
       : "證件僅於本機瀏覽器處理，不會上傳或儲存。";
-    if (isDocument) renderDocuments();
+    if (isDocument) renderDocumentEditor();
   }
 
   documentEl.identityModeBtn.addEventListener("click", () => setMode("identity"));
@@ -549,17 +600,29 @@
       window.clearTimeout(documentState.pdfWarmTimer);
       documentState.pdfWarmTimer = null;
     }
+    if (documentState.pdfWarmIdle && typeof window.cancelIdleCallback === "function") {
+      window.cancelIdleCallback(documentState.pdfWarmIdle);
+      documentState.pdfWarmIdle = null;
+    }
     if (documentState.pdfBundle?.objectUrl) URL.revokeObjectURL(documentState.pdfBundle.objectUrl);
     documentState.pdfBundle = null;
-    if (documentState.documents.length) {
+    if (allDocumentItems().length) {
       documentState.pdfWarmTimer = window.setTimeout(() => {
         documentState.pdfWarmTimer = null;
-        try {
-          buildDocumentPdfBundle();
-        } catch (error) {
-          console.error("Document PDF preparation failed.", error);
+        const prepare = () => {
+          documentState.pdfWarmIdle = null;
+          try {
+            buildDocumentPdfBundle();
+          } catch (error) {
+            console.error("Document PDF preparation failed.", error);
+          }
+        };
+        if (typeof window.requestIdleCallback === "function") {
+          documentState.pdfWarmIdle = window.requestIdleCallback(prepare, { timeout: 4000 });
+        } else {
+          prepare();
         }
-      }, 500);
+      }, 1400);
     }
   }
 
@@ -576,7 +639,16 @@
         const points = best?.points || fullDocumentQuad(sourceCanvas);
         const currentCanvas = best ? warpDocumentCanvas(sourceCanvas, points) : cloneDocumentCanvas(sourceCanvas);
         const normalized = normalizedDocumentPoints(points, sourceCanvas.width, sourceCanvas.height);
-        documentState.documents.push({
+        const page = ensureDocumentPage();
+        const correctedRatio = currentCanvas.width / Math.max(1, currentCanvas.height);
+        let layoutWidthCm = DEFAULT_DOCUMENT_WIDTH_CM;
+        let layoutHeightCm = layoutWidthCm / correctedRatio;
+        if (layoutHeightCm > DEFAULT_DOCUMENT_HEIGHT_CM) {
+          layoutHeightCm = DEFAULT_DOCUMENT_HEIGHT_CM;
+          layoutWidthCm = layoutHeightCm * correctedRatio;
+        }
+        const cascadeOffset = (page.documents.length % 5) * 0.45;
+        const item = {
           id: documentUid(),
           name: file.name,
           sourceDataUrl,
@@ -592,14 +664,23 @@
           candidateIndex: 0,
           autoDetected: Boolean(best),
           manuallyAdjusted: false,
-          status: best ? "已自動裁切" : "建議手動調整"
-        });
+          status: best ? "已自動裁切" : "建議手動調整",
+          layout: {
+            xCm: Math.min(A4_WIDTH_CM - layoutWidthCm, Math.max(0, (A4_WIDTH_CM - layoutWidthCm) / 2 + cascadeOffset)),
+            yCm: Math.min(A4_HEIGHT_CM - layoutHeightCm, Math.max(0, (A4_HEIGHT_CM - layoutHeightCm) / 2 + cascadeOffset)),
+            widthCm: layoutWidthCm,
+            heightCm: layoutHeightCm,
+            lockRatio: true
+          }
+        };
+        page.documents.push(item);
+        documentState.selectedItemId = item.id;
         documentLog(`${file.name}：${best ? "已找到文件外框" : "未找到明確外框，已保留原圖"}`);
       } catch (error) {
         console.error("Document import failed.", error);
         documentLog(`${file.name} 處理失敗，已略過`);
       }
-      renderDocuments();
+      renderDocumentEditor();
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
     invalidateDocumentPdf();
@@ -611,37 +692,49 @@
     return node.innerHTML;
   }
 
-  function renderDocuments() {
-    const documents = documentState.documents;
-    documentEl.list.classList.toggle("empty", !documents.length);
-    if (!documents.length) {
-      documentEl.list.innerHTML = "尚未加入文件";
-    } else {
-      documentEl.list.innerHTML = documents.map((item, index) => `
-        <article class="document-item" data-document-id="${item.id}">
-          <button class="document-item-preview" type="button" data-document-action="crop" aria-label="調整文件 ${index + 1} 裁切">
-            <img src="${item.currentDataUrl}" alt="文件 ${index + 1}">
-          </button>
-          <div class="document-item-head">
-            <div class="document-item-title">文件 ${index + 1}<span class="document-item-name" title="${escapeDocumentHtml(item.name)}">${escapeDocumentHtml(item.name)}</span></div>
-            <span class="document-status ${item.autoDetected || item.manuallyAdjusted ? "" : "warn"}">${item.status}</span>
-          </div>
-          <div class="document-item-actions">
-            <button type="button" data-document-action="crop">調整裁切</button>
-            <button type="button" data-document-action="redetect">重新自動裁切</button>
-            <button type="button" data-document-action="rotate-left">左轉</button>
-            <button type="button" data-document-action="rotate-right">右轉</button>
-            <button type="button" data-document-action="move-up" ${index === 0 ? "disabled" : ""}>上移</button>
-            <button type="button" data-document-action="move-down" ${index === documents.length - 1 ? "disabled" : ""}>下移</button>
-            <button type="button" data-document-action="delete">刪除</button>
-          </div>
-        </article>
-      `).join("");
-    }
-    const hasDocuments = documents.length > 0;
+  function renderDocumentEditor() {
+    const page = ensureDocumentPage();
+    documentEl.pageTabs.innerHTML = documentState.pages.map((documentPage, index) => `
+      <button type="button" data-document-page-id="${documentPage.id}" class="${documentPage.id === page.id ? "active" : ""}" aria-pressed="${documentPage.id === page.id}">
+        第 ${index + 1} 頁
+      </button>
+    `).join("");
+    documentEl.pageItems.innerHTML = page.documents.map((item, index) => {
+      const selected = item.id === documentState.selectedItemId;
+      const layout = item.layout;
+      return `
+        <div class="document-layout-item ${selected ? "selected" : ""}" data-document-id="${item.id}"
+          role="button" tabindex="0" aria-label="文件 ${index + 1}：${escapeDocumentHtml(item.name)}"
+          style="left:${layout.xCm / A4_WIDTH_CM * 100}%;top:${layout.yCm / A4_HEIGHT_CM * 100}%;width:${layout.widthCm / A4_WIDTH_CM * 100}%;height:${layout.heightCm / A4_HEIGHT_CM * 100}%">
+          <img src="${item.currentDataUrl}" alt="${escapeDocumentHtml(item.name)}">
+          <span class="document-layout-item-label">文件 ${index + 1}</span>
+          <span class="document-resize-handle right" data-layout-resize="right" aria-hidden="true"></span>
+          <span class="document-resize-handle bottom" data-layout-resize="bottom" aria-hidden="true"></span>
+          <span class="document-resize-handle corner" data-layout-resize="corner" aria-hidden="true"></span>
+        </div>
+      `;
+    }).join("");
+    documentEl.emptyPageAction.hidden = page.documents.length > 0;
+    documentEl.deletePageBtn.disabled = documentState.pages.length <= 1;
+    renderDocumentInspector();
+    const hasDocuments = allDocumentItems().length > 0;
     documentEl.pdfBtn.disabled = !hasDocuments;
     documentEl.sharePdfBtn.disabled = !hasDocuments;
-    if (/SamsungBrowser\//i.test(navigator.userAgent)) documentEl.pdfBtn.textContent = "下載 PDF";
+    documentEl.pdfBtn.textContent = /SamsungBrowser\//i.test(navigator.userAgent) ? "下載 PDF" : "產生 PDF";
+  }
+
+  function renderDocumentInspector() {
+    const selected = selectedDocumentItem();
+    const onActivePage = activeDocumentPage()?.documents.includes(selected);
+    documentEl.noSelection.hidden = Boolean(selected && onActivePage);
+    documentEl.selectionControls.hidden = !(selected && onActivePage);
+    if (!selected || !onActivePage) return;
+    documentEl.selectedName.textContent = selected.name;
+    documentEl.selectedStatus.textContent = selected.status;
+    documentEl.selectedStatus.classList.toggle("warn", !(selected.autoDetected || selected.manuallyAdjusted));
+    documentEl.widthCm.value = selected.layout.widthCm.toFixed(1);
+    documentEl.heightCm.value = selected.layout.heightCm.toFixed(1);
+    documentEl.lockRatio.checked = selected.layout.lockRatio;
   }
 
   function rotatedSourceCanvas(item, rotation = item.rotation) {
@@ -675,6 +768,10 @@
     );
     item.currentCanvas = warpDocumentCanvas(rotated, points);
     item.currentDataUrl = item.currentCanvas.toDataURL("image/jpeg", 0.94);
+    if (item.layout?.lockRatio) {
+      item.layout.heightCm = item.layout.widthCm / (item.currentCanvas.width / Math.max(1, item.currentCanvas.height));
+      clampDocumentLayout(item);
+    }
     invalidateDocumentPdf();
   }
 
@@ -683,7 +780,7 @@
     if (!candidates.length) {
       item.autoDetected = false;
       item.status = "建議手動調整";
-      renderDocuments();
+      renderDocumentEditor();
       documentToast("未找到明確文件外框，請手動調整四角。");
       openDocumentCrop(item.id, opener);
       return;
@@ -699,42 +796,225 @@
     item.manuallyAdjusted = false;
     item.status = "已自動裁切";
     refreshDocumentOutput(item);
-    renderDocuments();
+    renderDocumentEditor();
   }
 
-  function moveDocument(item, direction) {
-    const index = documentState.documents.indexOf(item);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= documentState.documents.length) return;
-    documentState.documents.splice(index, 1);
-    documentState.documents.splice(target, 0, item);
+  function clampDocumentLayout(item) {
+    const layout = item.layout;
+    layout.widthCm = Math.min(A4_WIDTH_CM, Math.max(1, layout.widthCm));
+    layout.heightCm = Math.min(A4_HEIGHT_CM, Math.max(1, layout.heightCm));
+    layout.xCm = Math.min(A4_WIDTH_CM - layout.widthCm, Math.max(0, layout.xCm));
+    layout.yCm = Math.min(A4_HEIGHT_CM - layout.heightCm, Math.max(0, layout.yCm));
+  }
+
+  function updateDocumentLayoutElement(item) {
+    const node = documentEl.pageItems.querySelector(`[data-document-id="${item.id}"]`);
+    if (!node) return;
+    node.style.left = `${item.layout.xCm / A4_WIDTH_CM * 100}%`;
+    node.style.top = `${item.layout.yCm / A4_HEIGHT_CM * 100}%`;
+    node.style.width = `${item.layout.widthCm / A4_WIDTH_CM * 100}%`;
+    node.style.height = `${item.layout.heightCm / A4_HEIGHT_CM * 100}%`;
+    if (item.id === documentState.selectedItemId) renderDocumentInspector();
+  }
+
+  function rotatePlacedDocument(item, degrees) {
+    const centerX = item.layout.xCm + item.layout.widthCm / 2;
+    const centerY = item.layout.yCm + item.layout.heightCm / 2;
+    item.rotation = normalizeDocumentRotation(item.rotation + degrees);
+    item.lastAppliedCrop.rotation = item.rotation;
+    [item.layout.widthCm, item.layout.heightCm] = [item.layout.heightCm, item.layout.widthCm];
+    item.layout.xCm = centerX - item.layout.widthCm / 2;
+    item.layout.yCm = centerY - item.layout.heightCm / 2;
+    item.status = "已旋轉";
+    clampDocumentLayout(item);
+    refreshDocumentOutput(item);
+    renderDocumentEditor();
+  }
+
+  function deletePlacedDocument(item) {
+    const found = findDocumentItem(item.id);
+    if (!found.page) return;
+    found.page.documents = found.page.documents.filter((documentItem) => documentItem.id !== item.id);
+    if (documentState.selectedItemId === item.id) documentState.selectedItemId = null;
     invalidateDocumentPdf();
-    renderDocuments();
+    renderDocumentEditor();
   }
 
-  documentEl.list.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-document-action]");
+  documentEl.pageTabs.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-document-page-id]");
+    if (!button) return;
+    documentState.activePageId = button.dataset.documentPageId;
+    documentState.selectedItemId = null;
+    renderDocumentEditor();
+  });
+
+  documentEl.addPageBtn.addEventListener("click", () => {
+    const page = createDocumentPage();
+    documentState.pages.push(page);
+    documentState.activePageId = page.id;
+    documentState.selectedItemId = null;
+    invalidateDocumentPdf();
+    renderDocumentEditor();
+  });
+
+  documentEl.deletePageBtn.addEventListener("click", () => {
+    if (documentState.pages.length <= 1) return;
+    const page = activeDocumentPage();
+    if (!page) return;
+    if (page.documents.length && !window.confirm("刪除此頁及頁面內的所有文件？")) return;
+    const index = documentState.pages.indexOf(page);
+    documentState.pages = documentState.pages.filter((documentPage) => documentPage.id !== page.id);
+    documentState.activePageId = documentState.pages[Math.min(index, documentState.pages.length - 1)].id;
+    documentState.selectedItemId = null;
+    invalidateDocumentPdf();
+    renderDocumentEditor();
+  });
+
+  documentEl.pageItems.addEventListener("click", (event) => {
     const itemNode = event.target.closest("[data-document-id]");
-    if (!button || !itemNode) return;
-    const item = documentState.documents.find((documentItem) => documentItem.id === itemNode.dataset.documentId);
+    if (!itemNode || performance.now() < documentState.suppressClickUntil) return;
+    documentState.selectedItemId = itemNode.dataset.documentId;
+    renderDocumentEditor();
+  });
+
+  documentEl.pageItems.addEventListener("dblclick", (event) => {
+    const itemNode = event.target.closest("[data-document-id]");
+    if (itemNode) openDocumentCrop(itemNode.dataset.documentId, itemNode);
+  });
+
+  function startDocumentLayoutGesture(event) {
+    const itemNode = event.target.closest("[data-document-id]");
+    if (!itemNode || documentState.layoutGesture) return;
+    const item = findDocumentItem(itemNode.dataset.documentId).item;
     if (!item) return;
-    const action = button.dataset.documentAction;
+    event.preventDefault();
+    event.stopPropagation();
+    documentState.selectedItemId = item.id;
+    documentEl.pageItems.querySelectorAll(".document-layout-item.selected").forEach((node) => node.classList.remove("selected"));
+    itemNode.classList.add("selected");
+    const resize = event.target.closest("[data-layout-resize]")?.dataset.layoutResize || "move";
+    documentState.layoutGesture = {
+      pointerId: event.pointerId,
+      target: itemNode,
+      item,
+      mode: resize,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLayout: { ...item.layout },
+      ratio: item.layout.widthCm / Math.max(0.1, item.layout.heightCm),
+      moved: false
+    };
+    try { itemNode.setPointerCapture(event.pointerId); } catch (_) { /* Synthetic events do not capture. */ }
+    renderDocumentInspector();
+  }
+
+  function updateDocumentLayoutGesture(event) {
+    const gesture = documentState.layoutGesture;
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const pageRect = documentEl.dropZone.getBoundingClientRect();
+    const dx = (event.clientX - gesture.startX) / Math.max(1, pageRect.width) * A4_WIDTH_CM;
+    const dy = (event.clientY - gesture.startY) / Math.max(1, pageRect.height) * A4_HEIGHT_CM;
+    if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) > 3) gesture.moved = true;
+    const layout = gesture.item.layout;
+    if (gesture.mode === "move") {
+      layout.xCm = gesture.startLayout.xCm + dx;
+      layout.yCm = gesture.startLayout.yCm + dy;
+    } else {
+      let width = gesture.startLayout.widthCm;
+      let height = gesture.startLayout.heightCm;
+      if (gesture.mode === "right" || gesture.mode === "corner") width += dx;
+      if (gesture.mode === "bottom" || gesture.mode === "corner") height += dy;
+      if (layout.lockRatio) {
+        if (gesture.mode === "bottom" || (gesture.mode === "corner" && Math.abs(dy) > Math.abs(dx))) width = height * gesture.ratio;
+        else height = width / gesture.ratio;
+      }
+      layout.widthCm = width;
+      layout.heightCm = height;
+    }
+    clampDocumentLayout(gesture.item);
+    updateDocumentLayoutElement(gesture.item);
+  }
+
+  function endDocumentLayoutGesture(event) {
+    const gesture = documentState.layoutGesture;
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    event.preventDefault();
+    if (gesture.moved) documentState.suppressClickUntil = performance.now() + 450;
+    try {
+      if (gesture.target.hasPointerCapture(event.pointerId)) gesture.target.releasePointerCapture(event.pointerId);
+    } catch (_) { /* Capture may already be released. */ }
+    documentState.layoutGesture = null;
+    invalidateDocumentPdf();
+    renderDocumentEditor();
+  }
+
+  documentEl.pageItems.addEventListener("pointerdown", startDocumentLayoutGesture, { passive: false });
+  documentEl.pageItems.addEventListener("pointermove", updateDocumentLayoutGesture, { passive: false });
+  documentEl.pageItems.addEventListener("pointerup", endDocumentLayoutGesture, { passive: false });
+  documentEl.pageItems.addEventListener("pointercancel", endDocumentLayoutGesture, { passive: false });
+
+  documentEl.pageItems.addEventListener("keydown", (event) => {
+    const itemNode = event.target.closest("[data-document-id]");
+    if (!itemNode) return;
+    const item = findDocumentItem(itemNode.dataset.documentId).item;
+    if (!item) return;
+    if (event.key === "Enter") {
+      event.preventDefault();
+      openDocumentCrop(item.id, itemNode);
+      return;
+    }
+    const delta = event.shiftKey ? 0.5 : 0.1;
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === "ArrowLeft") item.layout.xCm -= delta;
+    if (event.key === "ArrowRight") item.layout.xCm += delta;
+    if (event.key === "ArrowUp") item.layout.yCm -= delta;
+    if (event.key === "ArrowDown") item.layout.yCm += delta;
+    clampDocumentLayout(item);
+    invalidateDocumentPdf();
+    updateDocumentLayoutElement(item);
+  });
+
+  documentEl.inspector.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-selected-document-action]");
+    const item = selectedDocumentItem();
+    if (!button || !item) return;
+    const action = button.dataset.selectedDocumentAction;
     if (action === "crop") openDocumentCrop(item.id, button);
     if (action === "redetect") void redetectDocumentItem(item, button);
-    if (action === "rotate-left" || action === "rotate-right") {
-      item.rotation = normalizeDocumentRotation(item.rotation + (action === "rotate-left" ? -90 : 90));
-      item.lastAppliedCrop.rotation = item.rotation;
-      item.status = "已旋轉";
-      refreshDocumentOutput(item);
-      renderDocuments();
+    if (action === "rotate-left") rotatePlacedDocument(item, -90);
+    if (action === "rotate-right") rotatePlacedDocument(item, 90);
+    if (action === "delete") deletePlacedDocument(item);
+  });
+
+  function applyDocumentSizeInput(changedAxis) {
+    const item = selectedDocumentItem();
+    if (!item) return;
+    const width = Number(documentEl.widthCm.value);
+    const height = Number(documentEl.heightCm.value);
+    const ratio = item.layout.widthCm / Math.max(0.1, item.layout.heightCm);
+    if (changedAxis === "width" && Number.isFinite(width)) {
+      item.layout.widthCm = width;
+      if (item.layout.lockRatio) item.layout.heightCm = width / ratio;
     }
-    if (action === "move-up") moveDocument(item, -1);
-    if (action === "move-down") moveDocument(item, 1);
-    if (action === "delete") {
-      documentState.documents = documentState.documents.filter((documentItem) => documentItem.id !== item.id);
-      invalidateDocumentPdf();
-      renderDocuments();
+    if (changedAxis === "height" && Number.isFinite(height)) {
+      item.layout.heightCm = height;
+      if (item.layout.lockRatio) item.layout.widthCm = height * ratio;
     }
+    clampDocumentLayout(item);
+    invalidateDocumentPdf();
+    updateDocumentLayoutElement(item);
+  }
+
+  documentEl.widthCm.addEventListener("input", () => applyDocumentSizeInput("width"));
+  documentEl.heightCm.addEventListener("input", () => applyDocumentSizeInput("height"));
+  documentEl.lockRatio.addEventListener("change", () => {
+    const item = selectedDocumentItem();
+    if (!item) return;
+    item.layout.lockRatio = documentEl.lockRatio.checked;
+    invalidateDocumentPdf();
   });
 
   function openDocumentPicker(input) {
@@ -744,12 +1024,7 @@
 
   documentEl.selectBtn.addEventListener("click", () => openDocumentPicker(documentEl.imageInput));
   documentEl.cameraBtn.addEventListener("click", () => openDocumentPicker(documentEl.cameraInput));
-  documentEl.dropZone.addEventListener("click", () => openDocumentPicker(documentEl.imageInput));
-  documentEl.dropZone.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    openDocumentPicker(documentEl.imageInput);
-  });
+  documentEl.emptyPageAction.addEventListener("click", () => openDocumentPicker(documentEl.imageInput));
   documentEl.imageInput.addEventListener("change", () => void importDocumentFiles(documentEl.imageInput.files));
   documentEl.cameraInput.addEventListener("change", () => void importDocumentFiles(documentEl.cameraInput.files));
   ["dragenter", "dragover"].forEach((type) => documentEl.dropZone.addEventListener(type, (event) => {
@@ -785,7 +1060,7 @@
   }
 
   function openDocumentCrop(itemId, opener = document.activeElement) {
-    const item = documentState.documents.find((documentItem) => documentItem.id === itemId);
+    const { page, item } = findDocumentItem(itemId);
     if (!item) return;
     documentState.activeId = itemId;
     documentState.opener = opener;
@@ -816,7 +1091,7 @@
       item.originalWidth,
       item.originalHeight
     );
-    documentEl.cropContext.textContent = `文件 ${documentState.documents.indexOf(item) + 1}｜${item.name}`;
+    documentEl.cropContext.textContent = `第 ${documentState.pages.indexOf(page) + 1} 頁｜文件 ${page.documents.indexOf(item) + 1}｜${item.name}`;
     documentEl.discardPrompt.hidden = true;
     lockDocumentBackground();
     documentEl.cropDialog.showModal();
@@ -1032,7 +1307,7 @@
   }
 
   function setDocumentCandidate(index) {
-    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    const item = findDocumentItem(documentState.activeId).item;
     if (!item || !documentState.cropCandidates.length) return;
     documentState.candidateIndex = ((index % documentState.cropCandidates.length) + documentState.cropCandidates.length) % documentState.cropCandidates.length;
     documentState.cropPoints = normalizedToRotatedDocumentPoints(
@@ -1049,7 +1324,7 @@
   documentEl.nextFrameBtn.addEventListener("click", () => setDocumentCandidate(documentState.candidateIndex + 1));
 
   documentEl.autoCropBtn.addEventListener("click", () => {
-    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    const item = findDocumentItem(documentState.activeId).item;
     if (!item) return;
     const candidates = detectDocumentCandidates(item.sourceCanvas);
     if (!candidates.length) {
@@ -1071,7 +1346,7 @@
   });
 
   async function rotateDocumentCrop(degrees) {
-    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    const item = findDocumentItem(documentState.activeId).item;
     if (!item) return;
     const normalizedCrop = rotatedToNormalizedDocumentPoints(
       documentState.cropPoints,
@@ -1097,7 +1372,7 @@
   documentEl.rotateRightBtn.addEventListener("click", () => void rotateDocumentCrop(90));
   documentEl.rotate180Btn.addEventListener("click", () => void rotateDocumentCrop(180));
   documentEl.resetCropBtn.addEventListener("click", () => {
-    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    const item = findDocumentItem(documentState.activeId).item;
     if (!item) return;
     documentState.rotation = documentState.initialSnapshot.rotation;
     drawDocumentCropSource(item, documentState.rotation);
@@ -1114,7 +1389,7 @@
   });
 
   function applyDocumentCrop() {
-    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    const item = findDocumentItem(documentState.activeId).item;
     if (!item) return;
     const points = documentOrderPoints(documentState.cropPoints);
     const normalized = rotatedToNormalizedDocumentPoints(points, documentState.rotation, item.originalWidth, item.originalHeight);
@@ -1124,6 +1399,10 @@
     item.candidateIndex = documentState.candidateIndex;
     item.currentCanvas = warpDocumentCanvas(documentEl.cropCanvas, points);
     item.currentDataUrl = item.currentCanvas.toDataURL("image/jpeg", 0.94);
+    if (item.layout?.lockRatio) {
+      item.layout.heightCm = item.layout.widthCm / (item.currentCanvas.width / Math.max(1, item.currentCanvas.height));
+      clampDocumentLayout(item);
+    }
     item.manuallyAdjusted = true;
     item.status = "已完成裁切";
     item.autoDetected = true;
@@ -1134,7 +1413,7 @@
   documentEl.applyCropBtn.addEventListener("click", () => {
     applyDocumentCrop();
     documentEl.cropDialog.close();
-    renderDocuments();
+    renderDocumentEditor();
   });
 
   function requestDocumentCropClose(force = false) {
@@ -1237,52 +1516,24 @@
     });
   });
 
-  function drawDocumentPage(item, orientation, fitMode, marginMm) {
-    const portrait = orientation === "portrait";
-    const pageWidthMm = portrait ? 210 : 297;
-    const pageHeightMm = portrait ? 297 : 210;
-    const pixelsPerMm = 150 / 25.4;
-    const pageCanvas = document.createElement("canvas");
-    pageCanvas.width = Math.round(pageWidthMm * pixelsPerMm);
-    pageCanvas.height = Math.round(pageHeightMm * pixelsPerMm);
-    const context = pageCanvas.getContext("2d");
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-    const margin = Math.round(marginMm * pixelsPerMm);
-    const availableWidth = Math.max(1, pageCanvas.width - margin * 2);
-    const availableHeight = Math.max(1, pageCanvas.height - margin * 2);
-    const source = item.currentCanvas;
-    let scale = Math.min(availableWidth / source.width, availableHeight / source.height);
-    if (fitMode === "width") scale = availableWidth / source.width;
-    if (fitMode === "height") scale = availableHeight / source.height;
-    if (fitMode === "cover") scale = Math.max(availableWidth / source.width, availableHeight / source.height);
-    const drawWidth = source.width * scale;
-    const drawHeight = source.height * scale;
-    const drawX = margin + (availableWidth - drawWidth) / 2;
-    const drawY = margin + (availableHeight - drawHeight) / 2;
-    context.save();
-    context.beginPath();
-    context.rect(margin, margin, availableWidth, availableHeight);
-    context.clip();
-    context.drawImage(source, drawX, drawY, drawWidth, drawHeight);
-    context.restore();
-    return pageCanvas;
-  }
-
   function buildDocumentPdfBundle() {
-    if (!documentState.documents.length || !window.jspdf?.jsPDF) return null;
-    const orientation = documentEl.orientation.value;
-    const fitMode = documentEl.fitMode.value;
-    const margin = Number(documentEl.margin.value);
+    if (!allDocumentItems().length || !window.jspdf?.jsPDF) return null;
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation, unit: "mm", format: "a4", compress: true });
-    const portrait = orientation === "portrait";
-    const pageWidth = portrait ? 210 : 297;
-    const pageHeight = portrait ? 297 : 210;
-    documentState.documents.forEach((item, index) => {
-      if (index > 0) pdf.addPage("a4", orientation);
-      const page = drawDocumentPage(item, orientation, fitMode, margin);
-      pdf.addImage(page.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, pageWidth, pageHeight, undefined, "FAST");
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+    documentState.pages.forEach((page, pageIndex) => {
+      if (pageIndex > 0) pdf.addPage("a4", "portrait");
+      page.documents.forEach((item) => {
+        pdf.addImage(
+          item.currentDataUrl,
+          "JPEG",
+          item.layout.xCm * 10,
+          item.layout.yCm * 10,
+          item.layout.widthCm * 10,
+          item.layout.heightCm * 10,
+          undefined,
+          "FAST"
+        );
+      });
     });
     const output = pdf.output("blob");
     const blob = output.type === "application/pdf" ? output : new Blob([output], { type: "application/pdf" });
@@ -1340,7 +1591,7 @@
     if (/SamsungBrowser\//i.test(navigator.userAgent)) downloadDocumentPdf(bundle);
     else if (isDocumentMobile()) openDocumentPdf(bundle);
     else downloadDocumentPdf(bundle);
-    documentLog(`已產生 ${documentState.documents.length} 頁 PDF：${bundle.filename}`);
+    documentLog(`已產生 ${documentState.pages.length} 頁 PDF：${bundle.filename}`);
   });
 
   documentEl.sharePdfBtn.addEventListener("click", async () => {
@@ -1352,13 +1603,13 @@
     if (/SamsungBrowser\//i.test(navigator.userAgent)) {
       openDocumentPdf(bundle);
       documentToast("PDF 已開啟，請使用閱讀器的分享功能傳送。");
-      documentLog(`已開啟 ${documentState.documents.length} 頁 PDF`);
+      documentLog(`已開啟 ${documentState.pages.length} 頁 PDF`);
       return;
     }
     if (bundle.file && typeof navigator.share === "function" && typeof navigator.canShare === "function" && navigator.canShare({ files: [bundle.file] })) {
       try {
         await navigator.share({ files: [bundle.file], title: "文件排版 PDF" });
-        documentLog(`已分享 ${documentState.documents.length} 頁 PDF`);
+        documentLog(`已分享 ${documentState.pages.length} 頁 PDF`);
         return;
       } catch (error) {
         if (error?.name === "AbortError") return;
@@ -1367,12 +1618,9 @@
     }
     downloadDocumentPdf(bundle);
     documentToast("此瀏覽器無法直接分享，已改為下載 PDF。");
-    documentLog(`已下載 ${documentState.documents.length} 頁 PDF`);
+    documentLog(`已下載 ${documentState.pages.length} 頁 PDF`);
   });
 
-  [documentEl.orientation, documentEl.fitMode, documentEl.margin].forEach((control) =>
-    control.addEventListener("change", invalidateDocumentPdf)
-  );
-
-  renderDocuments();
+  ensureDocumentPage();
+  renderDocumentEditor();
 })();
