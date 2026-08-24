@@ -6,7 +6,7 @@
   <title>證件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260809-7">
+  <link rel="stylesheet" href="./tool.css?v=20260824-1">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -17,16 +17,13 @@
       <p class="brand"><a class="brand-link" href="../../index.html">MUMING WorkKit</a></p>
       <h1>證件排版小幫手</h1>
     </div>
-    <p class="privacy">證件僅於本機瀏覽器處理，不會上傳或儲存。</p>
+    <p id="privacyNotice" class="privacy">證件僅於本機瀏覽器處理，不會上傳或儲存。</p>
   </header>
 
   <main>
-    <section class="steps" aria-label="流程">
-      <span class="active">1 上傳</span>
-      <span>2 自動裁切</span>
-      <span>3 確認</span>
-      <span>4 分組</span>
-      <span>5 PDF</span>
+    <section class="mode-switch" aria-label="排版模式">
+      <button id="identityModeBtn" class="active" type="button" aria-pressed="true">證件排版</button>
+      <button id="documentModeBtn" type="button" aria-pressed="false">文件排版</button>
     </section>
 
     <section id="diagnosticPanel" class="panel diagnostic-panel" aria-labelledby="diagnosticTitle" hidden>
@@ -52,20 +49,97 @@
       </div>
     </section>
 
-    <section class="workspace">
-      <section class="panel cases-panel">
-        <div class="panel-head">
-          <div>
-            <h2>案件工作區</h2>
-            <p id="engineStatus" class="engine">影像引擎載入中...</p>
-          </div>
-          <button id="addCaseBtn" class="ghost" type="button">＋新增下一組案件</button>
-        </div>
-        <p id="androidUploadHint" class="android-upload-hint" hidden>若沒有顯示相簿，請點「我的檔案」或「Files」，再選擇圖片。</p>
-        <div id="statusLog" class="status-log" aria-live="polite"></div>
-        <div id="cases"></div>
+    <div id="identityModePanel" class="mode-panel">
+      <section class="steps" aria-label="證件排版流程">
+        <span class="active">1 上傳</span>
+        <span>2 自動裁切</span>
+        <span>3 確認</span>
+        <span>4 分組</span>
+        <span>5 PDF</span>
       </section>
-    </section>
+
+      <section class="workspace">
+        <section class="panel cases-panel">
+          <div class="panel-head">
+            <div>
+              <h2>案件工作區</h2>
+              <p id="engineStatus" class="engine">影像引擎載入中...</p>
+            </div>
+            <button id="addCaseBtn" class="ghost" type="button">＋新增下一組案件</button>
+          </div>
+          <p id="androidUploadHint" class="android-upload-hint" hidden>若沒有顯示相簿，請點「我的檔案」或「Files」，再選擇圖片。</p>
+          <div id="statusLog" class="status-log" aria-live="polite"></div>
+          <div id="cases"></div>
+        </section>
+      </section>
+    </div>
+
+    <div id="documentModePanel" class="mode-panel" hidden>
+      <section class="steps" aria-label="文件排版流程">
+        <span class="active">1 上傳</span>
+        <span>2 自動裁切</span>
+        <span>3 校正</span>
+        <span>4 版面</span>
+        <span>5 PDF</span>
+      </section>
+
+      <section class="document-workspace">
+        <section class="panel document-panel">
+          <div class="panel-head">
+            <div>
+              <h2>文件清單</h2>
+              <p id="documentEngineStatus" class="engine">影像引擎載入中...</p>
+            </div>
+            <div class="document-import-actions">
+              <button id="documentSelectBtn" class="primary" type="button">選擇圖片</button>
+              <button id="documentCameraBtn" type="button">直接拍照</button>
+            </div>
+          </div>
+          <div id="documentDropZone" class="document-drop-zone" role="button" tabindex="0">
+            拖入多張文件照片，或點擊選擇圖片
+          </div>
+          <div id="documentStatusLog" class="status-log" aria-live="polite"></div>
+          <div id="documentList" class="document-list empty"></div>
+        </section>
+
+        <section class="panel document-layout-panel" aria-labelledby="documentLayoutTitle">
+          <div class="panel-head">
+            <div>
+              <h2 id="documentLayoutTitle">PDF 版面</h2>
+              <p class="engine">每張文件輸出為一頁，可合併成多頁 PDF。</p>
+            </div>
+          </div>
+          <div class="document-layout-controls">
+            <label>紙張方向
+              <select id="documentOrientation">
+                <option value="portrait">A4 直式</option>
+                <option value="landscape">A4 橫式</option>
+              </select>
+            </label>
+            <label>圖片配置
+              <select id="documentFitMode">
+                <option value="contain">原比例置中</option>
+                <option value="width">放大至頁寬</option>
+                <option value="height">放大至頁高</option>
+                <option value="cover">滿版鋪滿</option>
+              </select>
+            </label>
+            <label>頁面留白
+              <select id="documentMargin">
+                <option value="0">無留白</option>
+                <option value="5" selected>5 mm</option>
+                <option value="10">10 mm</option>
+                <option value="15">15 mm</option>
+              </select>
+            </label>
+          </div>
+          <div class="document-pdf-actions">
+            <button id="documentPdfBtn" class="primary" type="button">產生 PDF</button>
+            <button id="documentSharePdfBtn" type="button">分享 PDF</button>
+          </div>
+        </section>
+      </section>
+    </div>
 
   </main>
 
@@ -181,10 +255,63 @@
     </form>
   </dialog>
 
+  <dialog id="documentCropDialog" class="crop-dialog document-crop-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <div class="crop-dialog-title">
+          <h2>調整文件裁切</h2>
+          <span id="documentCropContext"></span>
+        </div>
+        <button class="icon" aria-label="關閉" type="button" data-document-crop-cancel tabindex="-1">×</button>
+      </div>
+      <div class="crop-tools">
+        <button id="documentAutoCropBtn" class="primary" type="button">重新自動裁切</button>
+        <button id="documentNextFrameBtn" type="button" hidden>下一個外框</button>
+        <button id="documentRotateLeftBtn" type="button">向左 90°</button>
+        <button id="documentRotateRightBtn" type="button">向右 90°</button>
+        <button id="documentRotate180Btn" type="button">旋轉 180°</button>
+        <button id="documentResetCropBtn" type="button">還原原始裁切</button>
+      </div>
+      <div class="crop-grid">
+        <div class="crop-source">
+          <div id="documentCropStage" class="crop-stage">
+            <canvas id="documentCropCanvas" tabindex="0" aria-label="文件裁切影像"></canvas>
+            <svg id="documentCropOverlay"></svg>
+          </div>
+          <p id="documentCropHint" class="crop-handle-hint">
+            <span class="keyboard-crop-hint">使用方向鍵微調，Shift＋方向鍵快速移動</span>
+            <span class="touch-crop-hint">拖曳四角調整文件範圍</span>
+          </p>
+        </div>
+        <div class="crop-preview">
+          <h3>校正預覽</h3>
+          <canvas id="documentCorrectedCanvas"></canvas>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" data-document-crop-cancel>取消</button>
+        <button id="documentApplyCropBtn" class="primary" type="button">套用</button>
+      </div>
+      <div id="documentDiscardPrompt" class="discard-crop-prompt" hidden>
+        <div class="discard-crop-box" role="alertdialog" aria-modal="true" aria-labelledby="documentDiscardTitle">
+          <h3 id="documentDiscardTitle">放棄尚未套用的修改？</h3>
+          <p>四角位置與旋轉變更尚未套用。</p>
+          <div class="dialog-actions">
+            <button id="documentKeepEditingBtn" type="button">繼續編輯</button>
+            <button id="documentDiscardBtn" class="danger" type="button">放棄修改</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
   <input id="slotGalleryInput" type="file" accept="image/*" hidden>
   <input id="slotPdfInput" type="file" accept="application/pdf,.pdf" hidden>
   <input id="slotMixedInput" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" hidden>
+  <input id="documentImageInput" type="file" accept="image/*" multiple hidden>
+  <input id="documentCameraInput" type="file" accept="image/*" capture="environment" hidden>
 
   <script src="./app.js?v=20260809-13"></script>
+  <script src="./document-mode.js?v=20260824-1"></script>
 </body>
 </html>

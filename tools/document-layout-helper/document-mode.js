@@ -1,0 +1,1378 @@
+(() => {
+  "use strict";
+
+  const documentState = {
+    mode: "identity",
+    documents: [],
+    cvReady: false,
+    activeId: null,
+    cropPoints: [],
+    cropCandidates: [],
+    candidateIndex: 0,
+    rotation: 0,
+    openSnapshot: null,
+    initialSnapshot: null,
+    dirty: false,
+    activeHandle: null,
+    opener: null,
+    pageScrollY: 0,
+    dragHandle: null,
+    dragPointerId: null,
+    dragTouchId: null,
+    dragCaptureTarget: null,
+    inputMode: null,
+    dragStart: null,
+    dragMoved: false,
+    suppressClickUntil: 0,
+    pdfBundle: null,
+    pdfWarmTimer: null
+  };
+
+  const documentEl = {
+    identityModeBtn: document.querySelector("#identityModeBtn"),
+    documentModeBtn: document.querySelector("#documentModeBtn"),
+    identityModePanel: document.querySelector("#identityModePanel"),
+    documentModePanel: document.querySelector("#documentModePanel"),
+    privacyNotice: document.querySelector("#privacyNotice"),
+    engineStatus: document.querySelector("#documentEngineStatus"),
+    selectBtn: document.querySelector("#documentSelectBtn"),
+    cameraBtn: document.querySelector("#documentCameraBtn"),
+    imageInput: document.querySelector("#documentImageInput"),
+    cameraInput: document.querySelector("#documentCameraInput"),
+    dropZone: document.querySelector("#documentDropZone"),
+    statusLog: document.querySelector("#documentStatusLog"),
+    list: document.querySelector("#documentList"),
+    orientation: document.querySelector("#documentOrientation"),
+    fitMode: document.querySelector("#documentFitMode"),
+    margin: document.querySelector("#documentMargin"),
+    pdfBtn: document.querySelector("#documentPdfBtn"),
+    sharePdfBtn: document.querySelector("#documentSharePdfBtn"),
+    cropDialog: document.querySelector("#documentCropDialog"),
+    cropContext: document.querySelector("#documentCropContext"),
+    cropStage: document.querySelector("#documentCropStage"),
+    cropCanvas: document.querySelector("#documentCropCanvas"),
+    cropOverlay: document.querySelector("#documentCropOverlay"),
+    cropHint: document.querySelector("#documentCropHint"),
+    correctedCanvas: document.querySelector("#documentCorrectedCanvas"),
+    autoCropBtn: document.querySelector("#documentAutoCropBtn"),
+    nextFrameBtn: document.querySelector("#documentNextFrameBtn"),
+    rotateLeftBtn: document.querySelector("#documentRotateLeftBtn"),
+    rotateRightBtn: document.querySelector("#documentRotateRightBtn"),
+    rotate180Btn: document.querySelector("#documentRotate180Btn"),
+    resetCropBtn: document.querySelector("#documentResetCropBtn"),
+    applyCropBtn: document.querySelector("#documentApplyCropBtn"),
+    discardPrompt: document.querySelector("#documentDiscardPrompt"),
+    keepEditingBtn: document.querySelector("#documentKeepEditingBtn"),
+    discardBtn: document.querySelector("#documentDiscardBtn")
+  };
+
+  const HANDLE_LABELS = ["左上角", "右上角", "右下角", "左下角"];
+
+  function documentUid() {
+    return `document-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+  }
+
+  function documentLog(message) {
+    const line = document.createElement("div");
+    line.textContent = message;
+    documentEl.statusLog.prepend(line);
+  }
+
+  function documentToast(message) {
+    let toast = document.querySelector("#workkitToast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "workkitToast";
+      toast.className = "workkit-toast";
+      toast.setAttribute("role", "status");
+      toast.setAttribute("aria-live", "polite");
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(documentToast.timer);
+    documentToast.timer = setTimeout(() => toast.classList.remove("show"), 3200);
+  }
+
+  function setMode(mode) {
+    documentState.mode = mode;
+    const isDocument = mode === "document";
+    documentEl.identityModeBtn.classList.toggle("active", !isDocument);
+    documentEl.documentModeBtn.classList.toggle("active", isDocument);
+    documentEl.identityModeBtn.setAttribute("aria-pressed", String(!isDocument));
+    documentEl.documentModeBtn.setAttribute("aria-pressed", String(isDocument));
+    documentEl.identityModePanel.hidden = isDocument;
+    documentEl.documentModePanel.hidden = !isDocument;
+    documentEl.privacyNotice.textContent = isDocument
+      ? "文件僅於本機瀏覽器處理，不會上傳或儲存。"
+      : "證件僅於本機瀏覽器處理，不會上傳或儲存。";
+    if (isDocument) renderDocuments();
+  }
+
+  documentEl.identityModeBtn.addEventListener("click", () => setMode("identity"));
+  documentEl.documentModeBtn.addEventListener("click", () => setMode("document"));
+
+  function waitForDocumentCv() {
+    return new Promise((resolve) => {
+      const check = () => {
+        if (window.cv?.Mat) {
+          if (cv.getBuildInformation) resolve();
+          else cv.onRuntimeInitialized = resolve;
+        } else {
+          setTimeout(check, 120);
+        }
+      };
+      check();
+    });
+  }
+
+  waitForDocumentCv().then(() => {
+    documentState.cvReady = true;
+    documentEl.engineStatus.textContent = "文件邊緣偵測已就緒";
+  }).catch(() => {
+    documentEl.engineStatus.textContent = "影像引擎載入失敗，仍可人工裁切";
+  });
+
+  function cloneDocumentPoints(points) {
+    return points.map((point) => ({ x: point.x, y: point.y }));
+  }
+
+  function normalizeDocumentRotation(rotation) {
+    return ((rotation % 360) + 360) % 360;
+  }
+
+  function documentOrderPoints(points) {
+    const center = points.reduce((sum, point) => ({
+      x: sum.x + point.x / points.length,
+      y: sum.y + point.y / points.length
+    }), { x: 0, y: 0 });
+    const sorted = points.slice().sort((a, b) =>
+      Math.atan2(a.y - center.y, a.x - center.x) - Math.atan2(b.y - center.y, b.x - center.x)
+    );
+    const start = sorted.reduce((best, point, index) =>
+      point.x + point.y < sorted[best].x + sorted[best].y ? index : best, 0
+    );
+    return [...sorted.slice(start), ...sorted.slice(0, start)];
+  }
+
+  function documentDistance(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  function documentPolygonArea(points) {
+    return Math.abs(points.reduce((sum, point, index) => {
+      const next = points[(index + 1) % points.length];
+      return sum + point.x * next.y - next.x * point.y;
+    }, 0) / 2);
+  }
+
+  function documentQuadRatio(points) {
+    const width = (documentDistance(points[0], points[1]) + documentDistance(points[3], points[2])) / 2;
+    const height = (documentDistance(points[0], points[3]) + documentDistance(points[1], points[2])) / 2;
+    return Math.max(width, height) / Math.max(1, Math.min(width, height));
+  }
+
+  function documentIsConvex(points) {
+    let sign = 0;
+    for (let index = 0; index < points.length; index += 1) {
+      const a = points[index];
+      const b = points[(index + 1) % points.length];
+      const c = points[(index + 2) % points.length];
+      const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+      if (Math.abs(cross) < 1) continue;
+      const current = Math.sign(cross);
+      if (!sign) sign = current;
+      if (sign !== current) return false;
+    }
+    return true;
+  }
+
+  function documentSegmentsIntersect(a, b, c, d) {
+    const ccw = (p1, p2, p3) =>
+      (p3.y - p1.y) * (p2.x - p1.x) > (p2.y - p1.y) * (p3.x - p1.x);
+    return ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d);
+  }
+
+  function validDocumentQuad(points, canvas) {
+    if (points.length !== 4 || points.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y))) return false;
+    const margin = Math.max(canvas.width, canvas.height) * 0.08;
+    if (points.some((point) => point.x < -margin || point.y < -margin || point.x > canvas.width + margin || point.y > canvas.height + margin)) return false;
+    if (!documentIsConvex(points)) return false;
+    if (documentSegmentsIntersect(points[0], points[1], points[2], points[3])) return false;
+    if (documentSegmentsIntersect(points[1], points[2], points[3], points[0])) return false;
+    const [tl, tr, br, bl] = points;
+    if (!(tl.x < tr.x && bl.x < br.x && tl.y < bl.y && tr.y < br.y)) return false;
+    const areaRatio = documentPolygonArea(points) / (canvas.width * canvas.height);
+    const ratio = documentQuadRatio(points);
+    return areaRatio >= 0.08 && ratio >= 1.03 && ratio <= 2.2;
+  }
+
+  function documentBounding(points) {
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+  }
+
+  function documentIntersectionRatio(a, b) {
+    const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+    const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    const intersection = width * height;
+    const areaA = (a.right - a.left) * (a.bottom - a.top);
+    const areaB = (b.right - b.left) * (b.bottom - b.top);
+    return intersection / Math.max(1, Math.min(areaA, areaB));
+  }
+
+  function documentAngleScore(points) {
+    let total = 0;
+    points.forEach((point, index) => {
+      const previous = points[(index + 3) % 4];
+      const next = points[(index + 1) % 4];
+      const ax = previous.x - point.x;
+      const ay = previous.y - point.y;
+      const bx = next.x - point.x;
+      const by = next.y - point.y;
+      const cosine = Math.abs((ax * bx + ay * by) / Math.max(1, Math.hypot(ax, ay) * Math.hypot(bx, by)));
+      total += Math.max(0, 1 - cosine);
+    });
+    return total / 4;
+  }
+
+  function sampleDocumentEdgeCoverage(points, edgeMat, scale) {
+    let hits = 0;
+    let samples = 0;
+    for (let side = 0; side < 4; side += 1) {
+      const a = points[side];
+      const b = points[(side + 1) % 4];
+      const count = Math.max(18, Math.min(100, Math.round(documentDistance(a, b) * scale / 12)));
+      for (let index = 0; index <= count; index += 1) {
+        const progress = index / count;
+        const x = Math.round((a.x + (b.x - a.x) * progress) * scale);
+        const y = Math.round((a.y + (b.y - a.y) * progress) * scale);
+        let found = false;
+        for (let offsetY = -2; offsetY <= 2 && !found; offsetY += 1) {
+          for (let offsetX = -2; offsetX <= 2; offsetX += 1) {
+            const px = Math.max(0, Math.min(edgeMat.cols - 1, x + offsetX));
+            const py = Math.max(0, Math.min(edgeMat.rows - 1, y + offsetY));
+            if (edgeMat.ucharPtr(py, px)[0] > 0) {
+              found = true;
+              break;
+            }
+          }
+        }
+        if (found) hits += 1;
+        samples += 1;
+      }
+    }
+    return samples ? hits / samples : 0;
+  }
+
+  function scoreDocumentCandidate(candidate, canvas) {
+    const points = documentOrderPoints(candidate.points);
+    if (!validDocumentQuad(points, canvas)) return null;
+    const area = documentPolygonArea(points);
+    const areaRatio = area / (canvas.width * canvas.height);
+    const ratio = documentQuadRatio(points);
+    const ratioScore = Math.max(0, 1 - Math.abs(ratio - Math.SQRT2) / 0.75);
+    const bounds = documentBounding(points);
+    const frameInsetX = canvas.width * 0.012;
+    const frameInsetY = canvas.height * 0.012;
+    const frameSides = [
+      bounds.left <= frameInsetX,
+      bounds.right >= canvas.width - frameInsetX,
+      bounds.top <= frameInsetY,
+      bounds.bottom >= canvas.height - frameInsetY
+    ].filter(Boolean).length;
+    // Thresholding often emits the source image boundary; it is not a detected sheet edge.
+    if (areaRatio > 0.94 && frameSides >= 3) return null;
+    const edgeDistance = (
+      bounds.left / canvas.width
+      + (canvas.width - bounds.right) / canvas.width
+      + bounds.top / canvas.height
+      + (canvas.height - bounds.bottom) / canvas.height
+    ) / 4;
+    const outerScore = Math.max(0, 1 - edgeDistance * 2.2);
+    const coverage = Math.min(1, candidate.edgeCoverage || 0);
+    const sourceBonus = candidate.source === "line" ? 0.28 : 0;
+    const score = areaRatio * 6.2 + coverage * 2.4 + documentAngleScore(points) * 0.9 + ratioScore * 0.65 + outerScore * 0.8 + sourceBonus;
+    return { ...candidate, points, area, areaRatio, ratio, score };
+  }
+
+  function documentLineIntersection(a, b) {
+    const denominator = (a.x1 - a.x2) * (b.y1 - b.y2) - (a.y1 - a.y2) * (b.x1 - b.x2);
+    if (Math.abs(denominator) < 0.001) return null;
+    return {
+      x: ((a.x1 * a.y2 - a.y1 * a.x2) * (b.x1 - b.x2) - (a.x1 - a.x2) * (b.x1 * b.y2 - b.y1 * b.x2)) / denominator,
+      y: ((a.x1 * a.y2 - a.y1 * a.x2) * (b.y1 - b.y2) - (a.y1 - a.y2) * (b.x1 * b.y2 - b.y1 * b.x2)) / denominator
+    };
+  }
+
+  function pickDocumentOuterLine(lines, side) {
+    if (!lines.length) return null;
+    return lines.slice().sort((a, b) => {
+      const aMid = side === "top" || side === "bottom" ? (a.y1 + a.y2) / 2 : (a.x1 + a.x2) / 2;
+      const bMid = side === "top" || side === "bottom" ? (b.y1 + b.y2) / 2 : (b.x1 + b.x2) / 2;
+      const positional = side === "top" || side === "left" ? aMid - bMid : bMid - aMid;
+      if (Math.abs(positional) > 18) return positional;
+      return b.length - a.length;
+    })[0];
+  }
+
+  function detectDocumentCandidates(canvas) {
+    if (!documentState.cvReady) return [];
+    const scale = Math.min(1, 1800 / Math.max(canvas.width, canvas.height));
+    const work = document.createElement("canvas");
+    work.width = Math.max(1, Math.round(canvas.width * scale));
+    work.height = Math.max(1, Math.round(canvas.height * scale));
+    work.getContext("2d").drawImage(canvas, 0, 0, work.width, work.height);
+    const src = cv.imread(work);
+    const gray = new cv.Mat();
+    const blur = new cv.Mat();
+    const edges = new cv.Mat();
+    const threshold = new cv.Mat();
+    const candidates = [];
+    try {
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+      cv.Canny(blur, edges, 24, 105);
+      cv.adaptiveThreshold(blur, threshold, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 31, 7);
+      const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+      cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, kernel);
+      cv.morphologyEx(threshold, threshold, cv.MORPH_CLOSE, kernel);
+      kernel.delete();
+
+      [edges, threshold].forEach((binary, passIndex) => {
+        const contours = new cv.MatVector();
+        const hierarchy = new cv.Mat();
+        try {
+          cv.findContours(binary, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+          for (let index = 0; index < contours.size(); index += 1) {
+            const contour = contours.get(index);
+            const contourArea = Math.abs(cv.contourArea(contour));
+            if (contourArea < work.width * work.height * 0.075) {
+              contour.delete();
+              continue;
+            }
+            const perimeter = cv.arcLength(contour, true);
+            for (const epsilon of [0.015, 0.025, 0.04]) {
+              const approximation = new cv.Mat();
+              cv.approxPolyDP(contour, approximation, epsilon * perimeter, true);
+              if (approximation.rows === 4 && cv.isContourConvex(approximation)) {
+                const points = [];
+                for (let pointIndex = 0; pointIndex < 4; pointIndex += 1) {
+                  points.push({
+                    x: approximation.intPtr(pointIndex, 0)[0] / scale,
+                    y: approximation.intPtr(pointIndex, 0)[1] / scale
+                  });
+                }
+                const ordered = documentOrderPoints(points);
+                candidates.push({
+                  points: ordered,
+                  source: passIndex === 0 ? "edge-contour" : "adaptive-contour",
+                  edgeCoverage: sampleDocumentEdgeCoverage(ordered, edges, scale)
+                });
+              }
+              approximation.delete();
+            }
+            contour.delete();
+          }
+        } finally {
+          contours.delete();
+          hierarchy.delete();
+        }
+      });
+
+      const lines = new cv.Mat();
+      try {
+        const minimumLength = Math.min(work.width, work.height) * 0.32;
+        cv.HoughLinesP(edges, lines, 1, Math.PI / 180, 55, minimumLength, 32);
+        const horizontal = [];
+        const vertical = [];
+        for (let index = 0; index < lines.rows; index += 1) {
+          const [x1, y1, x2, y2] = lines.intPtr(index, 0);
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const length = Math.hypot(dx, dy);
+          const line = { x1: x1 / scale, y1: y1 / scale, x2: x2 / scale, y2: y2 / scale, length: length / scale };
+          if (Math.abs(dy) <= Math.abs(dx) * 0.65) horizontal.push(line);
+          if (Math.abs(dx) <= Math.abs(dy) * 0.65) vertical.push(line);
+        }
+        const top = pickDocumentOuterLine(horizontal, "top");
+        const bottom = pickDocumentOuterLine(horizontal, "bottom");
+        const left = pickDocumentOuterLine(vertical, "left");
+        const right = pickDocumentOuterLine(vertical, "right");
+        if (top && bottom && left && right) {
+          const points = [
+            documentLineIntersection(top, left),
+            documentLineIntersection(top, right),
+            documentLineIntersection(bottom, right),
+            documentLineIntersection(bottom, left)
+          ];
+          if (points.every(Boolean)) {
+            const ordered = documentOrderPoints(points);
+            candidates.push({
+              points: ordered,
+              source: "line",
+              edgeCoverage: sampleDocumentEdgeCoverage(ordered, edges, scale)
+            });
+          }
+        }
+      } finally {
+        lines.delete();
+      }
+    } finally {
+      src.delete();
+      gray.delete();
+      blur.delete();
+      edges.delete();
+      threshold.delete();
+    }
+
+    const ranked = candidates.map((candidate) => scoreDocumentCandidate(candidate, canvas)).filter(Boolean)
+      .sort((a, b) => b.score - a.score);
+    const unique = [];
+    ranked.forEach((candidate) => {
+      const duplicate = unique.some((existing) =>
+        documentIntersectionRatio(documentBounding(candidate.points), documentBounding(existing.points)) > 0.82
+        && Math.min(candidate.area, existing.area) / Math.max(candidate.area, existing.area) > 0.86
+      );
+      if (!duplicate && unique.length < 3) unique.push(candidate);
+    });
+    return unique;
+  }
+
+  function fullDocumentQuad(canvas) {
+    return [
+      { x: 0, y: 0 },
+      { x: canvas.width, y: 0 },
+      { x: canvas.width, y: canvas.height },
+      { x: 0, y: canvas.height }
+    ];
+  }
+
+  function normalizedDocumentPoints(points, width, height) {
+    return points.map((point) => ({
+      x: Math.max(0, Math.min(1, point.x / Math.max(1, width))),
+      y: Math.max(0, Math.min(1, point.y / Math.max(1, height)))
+    }));
+  }
+
+  function originalDocumentPoints(points, width, height) {
+    return points.map((point) => ({ x: point.x * width, y: point.y * height }));
+  }
+
+  function originalToRotatedDocumentPoint(point, rotation, width, height) {
+    if (rotation === 90) return { x: height - point.y, y: point.x };
+    if (rotation === 180) return { x: width - point.x, y: height - point.y };
+    if (rotation === 270) return { x: point.y, y: width - point.x };
+    return { ...point };
+  }
+
+  function rotatedToOriginalDocumentPoint(point, rotation, width, height) {
+    if (rotation === 90) return { x: point.y, y: height - point.x };
+    if (rotation === 180) return { x: width - point.x, y: height - point.y };
+    if (rotation === 270) return { x: width - point.y, y: point.x };
+    return { ...point };
+  }
+
+  function normalizedToRotatedDocumentPoints(points, rotation, width, height) {
+    return documentOrderPoints(originalDocumentPoints(points, width, height)
+      .map((point) => originalToRotatedDocumentPoint(point, rotation, width, height)));
+  }
+
+  function rotatedToNormalizedDocumentPoints(points, rotation, width, height) {
+    return normalizedDocumentPoints(
+      points.map((point) => rotatedToOriginalDocumentPoint(point, rotation, width, height)),
+      width,
+      height
+    );
+  }
+
+  function documentCanvasFromFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = reject;
+        image.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = image.naturalWidth || image.width;
+          canvas.height = image.naturalHeight || image.height;
+          canvas.getContext("2d").drawImage(image, 0, 0);
+          resolve(canvas);
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function cloneDocumentCanvas(source) {
+    const canvas = document.createElement("canvas");
+    canvas.width = source.width;
+    canvas.height = source.height;
+    canvas.getContext("2d").drawImage(source, 0, 0);
+    return canvas;
+  }
+
+  function warpDocumentCanvas(sourceCanvas, inputPoints) {
+    const points = documentOrderPoints(inputPoints);
+    const measuredWidth = Math.max(documentDistance(points[0], points[1]), documentDistance(points[3], points[2]));
+    const measuredHeight = Math.max(documentDistance(points[0], points[3]), documentDistance(points[1], points[2]));
+    const scale = Math.min(1, 2400 / Math.max(measuredWidth, measuredHeight));
+    const width = Math.max(240, Math.round(measuredWidth * scale));
+    const height = Math.max(240, Math.round(measuredHeight * scale));
+    if (!documentState.cvReady) return cloneDocumentCanvas(sourceCanvas);
+    const source = cv.imread(sourceCanvas);
+    const output = new cv.Mat();
+    const sourcePoints = cv.matFromArray(4, 1, cv.CV_32FC2, points.flatMap((point) => [point.x, point.y]));
+    const targetPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, width, 0, width, height, 0, height]);
+    const matrix = cv.getPerspectiveTransform(sourcePoints, targetPoints);
+    try {
+      cv.warpPerspective(source, output, matrix, new cv.Size(width, height), cv.INTER_LINEAR, cv.BORDER_REPLICATE);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      cv.imshow(canvas, output);
+      return canvas;
+    } finally {
+      source.delete();
+      output.delete();
+      sourcePoints.delete();
+      targetPoints.delete();
+      matrix.delete();
+    }
+  }
+
+  function invalidateDocumentPdf() {
+    if (documentState.pdfWarmTimer) {
+      window.clearTimeout(documentState.pdfWarmTimer);
+      documentState.pdfWarmTimer = null;
+    }
+    if (documentState.pdfBundle?.objectUrl) URL.revokeObjectURL(documentState.pdfBundle.objectUrl);
+    documentState.pdfBundle = null;
+    if (documentState.documents.length) {
+      documentState.pdfWarmTimer = window.setTimeout(() => {
+        documentState.pdfWarmTimer = null;
+        try {
+          buildDocumentPdfBundle();
+        } catch (error) {
+          console.error("Document PDF preparation failed.", error);
+        }
+      }, 500);
+    }
+  }
+
+  async function importDocumentFiles(fileList) {
+    const files = [...fileList].filter((file) => file.type.startsWith("image/"));
+    if (!files.length) return;
+    documentLog(`開始處理 ${files.length} 張文件照片`);
+    for (const file of files) {
+      try {
+        const sourceCanvas = await documentCanvasFromFile(file);
+        const sourceDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.94);
+        const candidates = detectDocumentCandidates(sourceCanvas);
+        const best = candidates[0];
+        const points = best?.points || fullDocumentQuad(sourceCanvas);
+        const currentCanvas = best ? warpDocumentCanvas(sourceCanvas, points) : cloneDocumentCanvas(sourceCanvas);
+        const normalized = normalizedDocumentPoints(points, sourceCanvas.width, sourceCanvas.height);
+        documentState.documents.push({
+          id: documentUid(),
+          name: file.name,
+          sourceDataUrl,
+          sourceCanvas,
+          originalWidth: sourceCanvas.width,
+          originalHeight: sourceCanvas.height,
+          currentCanvas,
+          currentDataUrl: currentCanvas.toDataURL("image/jpeg", 0.94),
+          rotation: 0,
+          initialCrop: { points: cloneDocumentPoints(normalized), rotation: 0 },
+          lastAppliedCrop: { points: cloneDocumentPoints(normalized), rotation: 0 },
+          candidates: candidates.map((candidate) => normalizedDocumentPoints(candidate.points, sourceCanvas.width, sourceCanvas.height)),
+          candidateIndex: 0,
+          autoDetected: Boolean(best),
+          manuallyAdjusted: false,
+          status: best ? "已自動裁切" : "建議手動調整"
+        });
+        documentLog(`${file.name}：${best ? "已找到文件外框" : "未找到明確外框，已保留原圖"}`);
+      } catch (error) {
+        console.error("Document import failed.", error);
+        documentLog(`${file.name} 處理失敗，已略過`);
+      }
+      renderDocuments();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    invalidateDocumentPdf();
+  }
+
+  function escapeDocumentHtml(value) {
+    const node = document.createElement("span");
+    node.textContent = value;
+    return node.innerHTML;
+  }
+
+  function renderDocuments() {
+    const documents = documentState.documents;
+    documentEl.list.classList.toggle("empty", !documents.length);
+    if (!documents.length) {
+      documentEl.list.innerHTML = "尚未加入文件";
+    } else {
+      documentEl.list.innerHTML = documents.map((item, index) => `
+        <article class="document-item" data-document-id="${item.id}">
+          <button class="document-item-preview" type="button" data-document-action="crop" aria-label="調整文件 ${index + 1} 裁切">
+            <img src="${item.currentDataUrl}" alt="文件 ${index + 1}">
+          </button>
+          <div class="document-item-head">
+            <div class="document-item-title">文件 ${index + 1}<span class="document-item-name" title="${escapeDocumentHtml(item.name)}">${escapeDocumentHtml(item.name)}</span></div>
+            <span class="document-status ${item.autoDetected || item.manuallyAdjusted ? "" : "warn"}">${item.status}</span>
+          </div>
+          <div class="document-item-actions">
+            <button type="button" data-document-action="crop">調整裁切</button>
+            <button type="button" data-document-action="redetect">重新自動裁切</button>
+            <button type="button" data-document-action="rotate-left">左轉</button>
+            <button type="button" data-document-action="rotate-right">右轉</button>
+            <button type="button" data-document-action="move-up" ${index === 0 ? "disabled" : ""}>上移</button>
+            <button type="button" data-document-action="move-down" ${index === documents.length - 1 ? "disabled" : ""}>下移</button>
+            <button type="button" data-document-action="delete">刪除</button>
+          </div>
+        </article>
+      `).join("");
+    }
+    const hasDocuments = documents.length > 0;
+    documentEl.pdfBtn.disabled = !hasDocuments;
+    documentEl.sharePdfBtn.disabled = !hasDocuments;
+    if (/SamsungBrowser\//i.test(navigator.userAgent)) documentEl.pdfBtn.textContent = "下載 PDF";
+  }
+
+  function rotatedSourceCanvas(item, rotation = item.rotation) {
+    const source = item.sourceCanvas;
+    const rightAngle = rotation === 90 || rotation === 270;
+    const canvas = document.createElement("canvas");
+    canvas.width = rightAngle ? source.height : source.width;
+    canvas.height = rightAngle ? source.width : source.height;
+    const context = canvas.getContext("2d");
+    if (rotation === 90) {
+      context.translate(canvas.width, 0);
+      context.rotate(Math.PI / 2);
+    } else if (rotation === 180) {
+      context.translate(canvas.width, canvas.height);
+      context.rotate(Math.PI);
+    } else if (rotation === 270) {
+      context.translate(0, canvas.height);
+      context.rotate(-Math.PI / 2);
+    }
+    context.drawImage(source, 0, 0);
+    return canvas;
+  }
+
+  function refreshDocumentOutput(item) {
+    const rotated = rotatedSourceCanvas(item, item.rotation);
+    const points = normalizedToRotatedDocumentPoints(
+      item.lastAppliedCrop.points,
+      item.rotation,
+      item.originalWidth,
+      item.originalHeight
+    );
+    item.currentCanvas = warpDocumentCanvas(rotated, points);
+    item.currentDataUrl = item.currentCanvas.toDataURL("image/jpeg", 0.94);
+    invalidateDocumentPdf();
+  }
+
+  async function redetectDocumentItem(item, opener) {
+    const candidates = detectDocumentCandidates(item.sourceCanvas);
+    if (!candidates.length) {
+      item.autoDetected = false;
+      item.status = "建議手動調整";
+      renderDocuments();
+      documentToast("未找到明確文件外框，請手動調整四角。");
+      openDocumentCrop(item.id, opener);
+      return;
+    }
+    const normalizedCandidates = candidates.map((candidate) =>
+      normalizedDocumentPoints(candidate.points, item.originalWidth, item.originalHeight)
+    );
+    item.rotation = 0;
+    item.lastAppliedCrop = { points: cloneDocumentPoints(normalizedCandidates[0]), rotation: 0 };
+    item.candidates = normalizedCandidates;
+    item.candidateIndex = 0;
+    item.autoDetected = true;
+    item.manuallyAdjusted = false;
+    item.status = "已自動裁切";
+    refreshDocumentOutput(item);
+    renderDocuments();
+  }
+
+  function moveDocument(item, direction) {
+    const index = documentState.documents.indexOf(item);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= documentState.documents.length) return;
+    documentState.documents.splice(index, 1);
+    documentState.documents.splice(target, 0, item);
+    invalidateDocumentPdf();
+    renderDocuments();
+  }
+
+  documentEl.list.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-document-action]");
+    const itemNode = event.target.closest("[data-document-id]");
+    if (!button || !itemNode) return;
+    const item = documentState.documents.find((documentItem) => documentItem.id === itemNode.dataset.documentId);
+    if (!item) return;
+    const action = button.dataset.documentAction;
+    if (action === "crop") openDocumentCrop(item.id, button);
+    if (action === "redetect") void redetectDocumentItem(item, button);
+    if (action === "rotate-left" || action === "rotate-right") {
+      item.rotation = normalizeDocumentRotation(item.rotation + (action === "rotate-left" ? -90 : 90));
+      item.lastAppliedCrop.rotation = item.rotation;
+      item.status = "已旋轉";
+      refreshDocumentOutput(item);
+      renderDocuments();
+    }
+    if (action === "move-up") moveDocument(item, -1);
+    if (action === "move-down") moveDocument(item, 1);
+    if (action === "delete") {
+      documentState.documents = documentState.documents.filter((documentItem) => documentItem.id !== item.id);
+      invalidateDocumentPdf();
+      renderDocuments();
+    }
+  });
+
+  function openDocumentPicker(input) {
+    input.value = "";
+    input.click();
+  }
+
+  documentEl.selectBtn.addEventListener("click", () => openDocumentPicker(documentEl.imageInput));
+  documentEl.cameraBtn.addEventListener("click", () => openDocumentPicker(documentEl.cameraInput));
+  documentEl.dropZone.addEventListener("click", () => openDocumentPicker(documentEl.imageInput));
+  documentEl.dropZone.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openDocumentPicker(documentEl.imageInput);
+  });
+  documentEl.imageInput.addEventListener("change", () => void importDocumentFiles(documentEl.imageInput.files));
+  documentEl.cameraInput.addEventListener("change", () => void importDocumentFiles(documentEl.cameraInput.files));
+  ["dragenter", "dragover"].forEach((type) => documentEl.dropZone.addEventListener(type, (event) => {
+    event.preventDefault();
+    documentEl.dropZone.classList.add("drag-over");
+  }));
+  ["dragleave", "drop"].forEach((type) => documentEl.dropZone.addEventListener(type, (event) => {
+    event.preventDefault();
+    documentEl.dropZone.classList.remove("drag-over");
+  }));
+  documentEl.dropZone.addEventListener("drop", (event) => void importDocumentFiles(event.dataTransfer.files));
+
+  function lockDocumentBackground() {
+    if (document.body.classList.contains("document-crop-modal-open")) return;
+    documentState.pageScrollY = window.scrollY;
+    document.body.style.top = `-${documentState.pageScrollY}px`;
+    document.body.classList.add("document-crop-modal-open");
+  }
+
+  function unlockDocumentBackground() {
+    if (!document.body.classList.contains("document-crop-modal-open")) return;
+    const scrollY = documentState.pageScrollY;
+    document.body.classList.remove("document-crop-modal-open", "crop-handle-dragging");
+    document.body.style.top = "";
+    window.scrollTo(0, scrollY);
+  }
+
+  function drawDocumentCropSource(item, rotation) {
+    const source = rotatedSourceCanvas(item, rotation);
+    documentEl.cropCanvas.width = source.width;
+    documentEl.cropCanvas.height = source.height;
+    documentEl.cropCanvas.getContext("2d").drawImage(source, 0, 0);
+  }
+
+  function openDocumentCrop(itemId, opener = document.activeElement) {
+    const item = documentState.documents.find((documentItem) => documentItem.id === itemId);
+    if (!item) return;
+    documentState.activeId = itemId;
+    documentState.opener = opener;
+    documentState.rotation = normalizeDocumentRotation(item.lastAppliedCrop.rotation || 0);
+    documentState.openSnapshot = {
+      points: cloneDocumentPoints(item.lastAppliedCrop.points),
+      rotation: documentState.rotation
+    };
+    documentState.initialSnapshot = {
+      points: cloneDocumentPoints(item.initialCrop.points),
+      rotation: normalizeDocumentRotation(item.initialCrop.rotation || 0)
+    };
+    documentState.dirty = false;
+    documentState.activeHandle = null;
+    documentState.cropCandidates = [cloneDocumentPoints(item.lastAppliedCrop.points)];
+    item.candidates.forEach((candidate) => {
+      if (documentState.cropCandidates.length >= 3) return;
+      const duplicate = documentState.cropCandidates.some((saved) => saved.every((point, index) =>
+        Math.abs(point.x - candidate[index].x) < 0.00001 && Math.abs(point.y - candidate[index].y) < 0.00001
+      ));
+      if (!duplicate) documentState.cropCandidates.push(cloneDocumentPoints(candidate));
+    });
+    documentState.candidateIndex = 0;
+    drawDocumentCropSource(item, documentState.rotation);
+    documentState.cropPoints = normalizedToRotatedDocumentPoints(
+      item.lastAppliedCrop.points,
+      documentState.rotation,
+      item.originalWidth,
+      item.originalHeight
+    );
+    documentEl.cropContext.textContent = `文件 ${documentState.documents.indexOf(item) + 1}｜${item.name}`;
+    documentEl.discardPrompt.hidden = true;
+    lockDocumentBackground();
+    documentEl.cropDialog.showModal();
+    requestAnimationFrame(() => {
+      fitDocumentOverlay();
+      drawDocumentOverlay();
+      updateDocumentCorrectedPreview();
+      updateDocumentCandidateButton();
+      updateDocumentCropHint();
+      documentEl.applyCropBtn.focus();
+    });
+  }
+
+  function fitDocumentOverlay() {
+    const rect = documentEl.cropCanvas.getBoundingClientRect();
+    documentEl.cropOverlay.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+  }
+
+  function documentDisplayPoint(point) {
+    const rect = documentEl.cropCanvas.getBoundingClientRect();
+    return {
+      x: point.x * rect.width / documentEl.cropCanvas.width,
+      y: point.y * rect.height / documentEl.cropCanvas.height
+    };
+  }
+
+  function documentImagePoint(clientX, clientY) {
+    const rect = documentEl.cropCanvas.getBoundingClientRect();
+    return {
+      x: Math.min(documentEl.cropCanvas.width, Math.max(0, (clientX - rect.left) * documentEl.cropCanvas.width / rect.width)),
+      y: Math.min(documentEl.cropCanvas.height, Math.max(0, (clientY - rect.top) * documentEl.cropCanvas.height / rect.height))
+    };
+  }
+
+  function drawDocumentOverlay() {
+    const rect = documentEl.cropCanvas.getBoundingClientRect();
+    const stageRect = documentEl.cropStage.getBoundingClientRect();
+    documentEl.cropOverlay.style.left = `${rect.left - stageRect.left}px`;
+    documentEl.cropOverlay.style.top = `${rect.top - stageRect.top}px`;
+    documentEl.cropOverlay.style.width = `${rect.width}px`;
+    documentEl.cropOverlay.style.height = `${rect.height}px`;
+    const points = documentState.cropPoints.map(documentDisplayPoint);
+    if (documentEl.cropOverlay.querySelectorAll(".document-handle").length !== 4) {
+      documentEl.cropOverlay.innerHTML = `
+        <polygon fill="rgba(17,97,93,.18)" stroke="#30c2b3" stroke-width="2"></polygon>
+        ${points.map((point, index) => `
+          <g class="handle document-handle" data-index="${index}" tabindex="0" role="slider" aria-label="${HANDLE_LABELS[index]}">
+            <circle class="handle-hit" r="22"></circle>
+            <circle class="handle-dot" r="9" fill="#fff" stroke="#11615d" stroke-width="3"></circle>
+          </g>
+        `).join("")}`;
+    }
+    documentEl.cropOverlay.querySelector("polygon").setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
+    documentEl.cropOverlay.querySelectorAll(".document-handle").forEach((handle, index) => {
+      handle.setAttribute("transform", `translate(${points[index].x} ${points[index].y})`);
+      handle.setAttribute("aria-valuetext", `x ${Math.round(documentState.cropPoints[index].x)}，y ${Math.round(documentState.cropPoints[index].y)}`);
+      handle.classList.toggle("active", documentState.activeHandle === index);
+    });
+  }
+
+  function updateDocumentCorrectedPreview() {
+    const output = warpDocumentCanvas(documentEl.cropCanvas, documentState.cropPoints);
+    documentEl.correctedCanvas.width = output.width;
+    documentEl.correctedCanvas.height = output.height;
+    documentEl.correctedCanvas.getContext("2d").drawImage(output, 0, 0);
+  }
+
+  function updateDocumentCropHint() {
+    const label = HANDLE_LABELS[documentState.activeHandle];
+    const prefix = label ? `目前：${label}｜` : "";
+    documentEl.cropHint.querySelector(".keyboard-crop-hint").textContent = `${prefix}使用方向鍵微調，Shift＋方向鍵快速移動`;
+    documentEl.cropHint.querySelector(".touch-crop-hint").textContent = `${prefix}拖曳四角調整文件範圍`;
+  }
+
+  function setActiveDocumentHandle(index, focus = false) {
+    documentState.activeHandle = index;
+    documentEl.cropOverlay.querySelectorAll(".document-handle").forEach((handle, handleIndex) =>
+      handle.classList.toggle("active", handleIndex === index)
+    );
+    updateDocumentCropHint();
+    if (focus) documentEl.cropOverlay.querySelector(`.document-handle[data-index="${index}"]`)?.focus({ preventScroll: true });
+  }
+
+  function setDocumentDragging(active) {
+    documentEl.cropDialog.classList.toggle("crop-dragging", active);
+    documentEl.cropStage.classList.toggle("crop-dragging", active);
+    document.body.classList.toggle("crop-handle-dragging", active);
+  }
+
+  function clearDocumentDrag(pointerId = documentState.dragPointerId) {
+    const captureTarget = documentState.dragCaptureTarget;
+    documentState.dragHandle = null;
+    documentState.dragPointerId = null;
+    documentState.dragTouchId = null;
+    documentState.dragCaptureTarget = null;
+    documentState.inputMode = null;
+    documentState.dragStart = null;
+    setDocumentDragging(false);
+    if (captureTarget && pointerId !== null) {
+      try {
+        if (captureTarget.hasPointerCapture(pointerId)) captureTarget.releasePointerCapture(pointerId);
+      } catch (_) {
+        // Capture may already be released by the browser.
+      }
+    }
+  }
+
+  function updateDocumentDraggedPoint(clientX, clientY) {
+    if (documentState.dragHandle === null) return;
+    if (documentState.dragStart && Math.hypot(clientX - documentState.dragStart.x, clientY - documentState.dragStart.y) > 4) {
+      documentState.dragMoved = true;
+    }
+    documentState.cropPoints[documentState.dragHandle] = documentImagePoint(clientX, clientY);
+    documentState.dirty = true;
+    drawDocumentOverlay();
+    updateDocumentCorrectedPreview();
+  }
+
+  function blockDocumentTouch(event) {
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+  }
+
+  [documentEl.cropCanvas, documentEl.cropStage].forEach((surface) => {
+    surface.addEventListener("touchstart", blockDocumentTouch, { passive: false });
+    surface.addEventListener("touchmove", blockDocumentTouch, { passive: false });
+  });
+
+  documentEl.cropOverlay.addEventListener("pointerdown", (event) => {
+    const handle = event.target.closest?.(".document-handle");
+    if (!handle || documentState.inputMode === "touch" || documentState.dragHandle !== null) return;
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    documentState.inputMode = "pointer";
+    documentState.dragHandle = Number(handle.dataset.index);
+    documentState.dragPointerId = event.pointerId;
+    documentState.dragCaptureTarget = handle;
+    documentState.dragStart = { x: event.clientX, y: event.clientY };
+    documentState.dragMoved = false;
+    setActiveDocumentHandle(documentState.dragHandle, event.pointerType !== "touch");
+    setDocumentDragging(true);
+    try { handle.setPointerCapture(event.pointerId); } catch (_) { /* Synthetic input has no capture. */ }
+  }, { passive: false });
+
+  documentEl.cropOverlay.addEventListener("pointermove", (event) => {
+    if (documentState.inputMode !== "pointer" || event.pointerId !== documentState.dragPointerId) return;
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    updateDocumentDraggedPoint(event.clientX, event.clientY);
+  }, { passive: false });
+
+  function endDocumentPointer(event) {
+    if (documentState.inputMode !== "pointer" || event.pointerId !== documentState.dragPointerId) return;
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    if (documentState.dragMoved) documentState.suppressClickUntil = performance.now() + 500;
+    clearDocumentDrag(event.pointerId);
+  }
+
+  documentEl.cropOverlay.addEventListener("pointerup", endDocumentPointer);
+  documentEl.cropOverlay.addEventListener("pointercancel", endDocumentPointer);
+  documentEl.cropOverlay.addEventListener("lostpointercapture", () => {
+    if (documentState.inputMode === "pointer") clearDocumentDrag();
+  });
+
+  documentEl.cropOverlay.addEventListener("touchstart", (event) => {
+    blockDocumentTouch(event);
+    const handle = event.target.closest?.(".document-handle");
+    if (!handle || documentState.inputMode === "pointer" || documentState.dragHandle !== null) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    documentState.inputMode = "touch";
+    documentState.dragHandle = Number(handle.dataset.index);
+    documentState.dragTouchId = touch.identifier;
+    documentState.dragStart = { x: touch.clientX, y: touch.clientY };
+    documentState.dragMoved = false;
+    setActiveDocumentHandle(documentState.dragHandle);
+    setDocumentDragging(true);
+  }, { passive: false });
+
+  documentEl.cropOverlay.addEventListener("touchmove", (event) => {
+    blockDocumentTouch(event);
+    if (documentState.inputMode !== "touch" || documentState.dragHandle === null) return;
+    const touch = Array.from(event.touches).find((item) => item.identifier === documentState.dragTouchId);
+    if (touch) updateDocumentDraggedPoint(touch.clientX, touch.clientY);
+  }, { passive: false });
+
+  function endDocumentTouch(event) {
+    blockDocumentTouch(event);
+    if (documentState.inputMode !== "touch" || documentState.dragHandle === null) return;
+    const ended = event.type === "touchcancel"
+      || Array.from(event.changedTouches).some((touch) => touch.identifier === documentState.dragTouchId);
+    if (!ended) return;
+    if (documentState.dragMoved) documentState.suppressClickUntil = performance.now() + 500;
+    clearDocumentDrag(null);
+  }
+
+  documentEl.cropOverlay.addEventListener("touchend", endDocumentTouch, { passive: false });
+  documentEl.cropOverlay.addEventListener("touchcancel", endDocumentTouch, { passive: false });
+  documentEl.cropOverlay.addEventListener("click", (event) => {
+    if (performance.now() > documentState.suppressClickUntil) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    documentState.suppressClickUntil = 0;
+  }, true);
+  documentEl.cropOverlay.addEventListener("focusin", (event) => {
+    const handle = event.target.closest(".document-handle");
+    if (handle) setActiveDocumentHandle(Number(handle.dataset.index));
+  });
+
+  function updateDocumentCandidateButton() {
+    documentEl.nextFrameBtn.hidden = documentState.cropCandidates.length < 2;
+  }
+
+  function setDocumentCandidate(index) {
+    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    if (!item || !documentState.cropCandidates.length) return;
+    documentState.candidateIndex = ((index % documentState.cropCandidates.length) + documentState.cropCandidates.length) % documentState.cropCandidates.length;
+    documentState.cropPoints = normalizedToRotatedDocumentPoints(
+      documentState.cropCandidates[documentState.candidateIndex],
+      documentState.rotation,
+      item.originalWidth,
+      item.originalHeight
+    );
+    documentState.dirty = true;
+    drawDocumentOverlay();
+    updateDocumentCorrectedPreview();
+  }
+
+  documentEl.nextFrameBtn.addEventListener("click", () => setDocumentCandidate(documentState.candidateIndex + 1));
+
+  documentEl.autoCropBtn.addEventListener("click", () => {
+    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    if (!item) return;
+    const candidates = detectDocumentCandidates(item.sourceCanvas);
+    if (!candidates.length) {
+      documentToast("未找到明確文件外框，可直接拖曳四角調整。");
+      return;
+    }
+    documentState.rotation = 0;
+    drawDocumentCropSource(item, 0);
+    documentState.cropCandidates = candidates.map((candidate) =>
+      normalizedDocumentPoints(candidate.points, item.originalWidth, item.originalHeight)
+    );
+    documentState.candidateIndex = 0;
+    documentState.cropPoints = cloneDocumentPoints(candidates[0].points);
+    documentState.dirty = true;
+    fitDocumentOverlay();
+    drawDocumentOverlay();
+    updateDocumentCorrectedPreview();
+    updateDocumentCandidateButton();
+  });
+
+  async function rotateDocumentCrop(degrees) {
+    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    if (!item) return;
+    const normalizedCrop = rotatedToNormalizedDocumentPoints(
+      documentState.cropPoints,
+      documentState.rotation,
+      item.originalWidth,
+      item.originalHeight
+    );
+    documentState.rotation = normalizeDocumentRotation(documentState.rotation + degrees);
+    drawDocumentCropSource(item, documentState.rotation);
+    documentState.cropPoints = normalizedToRotatedDocumentPoints(
+      normalizedCrop,
+      documentState.rotation,
+      item.originalWidth,
+      item.originalHeight
+    );
+    documentState.dirty = true;
+    fitDocumentOverlay();
+    drawDocumentOverlay();
+    updateDocumentCorrectedPreview();
+  }
+
+  documentEl.rotateLeftBtn.addEventListener("click", () => void rotateDocumentCrop(-90));
+  documentEl.rotateRightBtn.addEventListener("click", () => void rotateDocumentCrop(90));
+  documentEl.rotate180Btn.addEventListener("click", () => void rotateDocumentCrop(180));
+  documentEl.resetCropBtn.addEventListener("click", () => {
+    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    if (!item) return;
+    documentState.rotation = documentState.initialSnapshot.rotation;
+    drawDocumentCropSource(item, documentState.rotation);
+    documentState.cropPoints = normalizedToRotatedDocumentPoints(
+      documentState.initialSnapshot.points,
+      documentState.rotation,
+      item.originalWidth,
+      item.originalHeight
+    );
+    documentState.dirty = true;
+    fitDocumentOverlay();
+    drawDocumentOverlay();
+    updateDocumentCorrectedPreview();
+  });
+
+  function applyDocumentCrop() {
+    const item = documentState.documents.find((documentItem) => documentItem.id === documentState.activeId);
+    if (!item) return;
+    const points = documentOrderPoints(documentState.cropPoints);
+    const normalized = rotatedToNormalizedDocumentPoints(points, documentState.rotation, item.originalWidth, item.originalHeight);
+    item.lastAppliedCrop = { points: cloneDocumentPoints(normalized), rotation: documentState.rotation };
+    item.rotation = documentState.rotation;
+    item.candidates = documentState.cropCandidates.map((candidate) => cloneDocumentPoints(candidate));
+    item.candidateIndex = documentState.candidateIndex;
+    item.currentCanvas = warpDocumentCanvas(documentEl.cropCanvas, points);
+    item.currentDataUrl = item.currentCanvas.toDataURL("image/jpeg", 0.94);
+    item.manuallyAdjusted = true;
+    item.status = "已完成裁切";
+    item.autoDetected = true;
+    documentState.dirty = false;
+    invalidateDocumentPdf();
+  }
+
+  documentEl.applyCropBtn.addEventListener("click", () => {
+    applyDocumentCrop();
+    documentEl.cropDialog.close();
+    renderDocuments();
+  });
+
+  function requestDocumentCropClose(force = false) {
+    if (documentState.dirty && !force) {
+      documentEl.discardPrompt.hidden = false;
+      documentEl.keepEditingBtn.focus();
+      return;
+    }
+    documentState.dirty = false;
+    documentEl.discardPrompt.hidden = true;
+    documentEl.cropDialog.close("cancel");
+  }
+
+  documentEl.cropDialog.querySelectorAll("[data-document-crop-cancel]").forEach((button) =>
+    button.addEventListener("click", () => requestDocumentCropClose())
+  );
+  documentEl.keepEditingBtn.addEventListener("click", () => {
+    documentEl.discardPrompt.hidden = true;
+    documentEl.applyCropBtn.focus();
+  });
+  documentEl.discardBtn.addEventListener("click", () => requestDocumentCropClose(true));
+  documentEl.cropDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    if (!documentEl.discardPrompt.hidden) documentEl.discardPrompt.hidden = true;
+    else requestDocumentCropClose();
+  });
+
+  function documentCropFocusable() {
+    const root = documentEl.discardPrompt.hidden ? documentEl.cropDialog : documentEl.discardPrompt;
+    return [...root.querySelectorAll('button:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])')]
+      .filter((node) => !node.hidden && !node.closest("[hidden]") && node.getClientRects().length > 0);
+  }
+
+  function moveDocumentHandle(key, fast) {
+    const index = documentState.activeHandle;
+    if (index === null) return;
+    const step = fast ? 10 : 1;
+    const delta = {
+      ArrowUp: { x: 0, y: -step },
+      ArrowDown: { x: 0, y: step },
+      ArrowLeft: { x: -step, y: 0 },
+      ArrowRight: { x: step, y: 0 }
+    }[key];
+    if (!delta) return;
+    const point = documentState.cropPoints[index];
+    documentState.cropPoints[index] = {
+      x: Math.min(documentEl.cropCanvas.width, Math.max(0, point.x + delta.x)),
+      y: Math.min(documentEl.cropCanvas.height, Math.max(0, point.y + delta.y))
+    };
+    documentState.dirty = true;
+    drawDocumentOverlay();
+    updateDocumentCorrectedPreview();
+  }
+
+  documentEl.cropDialog.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      requestDocumentCropClose();
+      return;
+    }
+    const active = document.activeElement;
+    const handle = active?.closest?.(".document-handle");
+    if (handle && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
+      setActiveDocumentHandle(Number(handle.dataset.index));
+      moveDocumentHandle(event.key, event.shiftKey);
+      return;
+    }
+    if (event.key === "Enter" && (handle || active === documentEl.cropCanvas)) {
+      event.preventDefault();
+      documentEl.applyCropBtn.click();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = documentCropFocusable();
+    if (!focusable.length) return;
+    event.preventDefault();
+    const currentIndex = focusable.indexOf(active);
+    const nextIndex = event.shiftKey
+      ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
+      : (currentIndex < 0 || currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
+    focusable[nextIndex].focus();
+  });
+
+  documentEl.cropDialog.addEventListener("close", () => {
+    const opener = documentState.opener;
+    clearDocumentDrag();
+    unlockDocumentBackground();
+    documentState.activeId = null;
+    documentState.opener = null;
+    setTimeout(() => opener?.isConnected && opener.focus(), 0);
+  });
+
+  window.addEventListener("resize", () => {
+    if (!documentEl.cropDialog.open) return;
+    requestAnimationFrame(() => {
+      fitDocumentOverlay();
+      drawDocumentOverlay();
+    });
+  });
+
+  function drawDocumentPage(item, orientation, fitMode, marginMm) {
+    const portrait = orientation === "portrait";
+    const pageWidthMm = portrait ? 210 : 297;
+    const pageHeightMm = portrait ? 297 : 210;
+    const pixelsPerMm = 150 / 25.4;
+    const pageCanvas = document.createElement("canvas");
+    pageCanvas.width = Math.round(pageWidthMm * pixelsPerMm);
+    pageCanvas.height = Math.round(pageHeightMm * pixelsPerMm);
+    const context = pageCanvas.getContext("2d");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+    const margin = Math.round(marginMm * pixelsPerMm);
+    const availableWidth = Math.max(1, pageCanvas.width - margin * 2);
+    const availableHeight = Math.max(1, pageCanvas.height - margin * 2);
+    const source = item.currentCanvas;
+    let scale = Math.min(availableWidth / source.width, availableHeight / source.height);
+    if (fitMode === "width") scale = availableWidth / source.width;
+    if (fitMode === "height") scale = availableHeight / source.height;
+    if (fitMode === "cover") scale = Math.max(availableWidth / source.width, availableHeight / source.height);
+    const drawWidth = source.width * scale;
+    const drawHeight = source.height * scale;
+    const drawX = margin + (availableWidth - drawWidth) / 2;
+    const drawY = margin + (availableHeight - drawHeight) / 2;
+    context.save();
+    context.beginPath();
+    context.rect(margin, margin, availableWidth, availableHeight);
+    context.clip();
+    context.drawImage(source, drawX, drawY, drawWidth, drawHeight);
+    context.restore();
+    return pageCanvas;
+  }
+
+  function buildDocumentPdfBundle() {
+    if (!documentState.documents.length || !window.jspdf?.jsPDF) return null;
+    const orientation = documentEl.orientation.value;
+    const fitMode = documentEl.fitMode.value;
+    const margin = Number(documentEl.margin.value);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation, unit: "mm", format: "a4", compress: true });
+    const portrait = orientation === "portrait";
+    const pageWidth = portrait ? 210 : 297;
+    const pageHeight = portrait ? 297 : 210;
+    documentState.documents.forEach((item, index) => {
+      if (index > 0) pdf.addPage("a4", orientation);
+      const page = drawDocumentPage(item, orientation, fitMode, margin);
+      pdf.addImage(page.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, pageWidth, pageHeight, undefined, "FAST");
+    });
+    const output = pdf.output("blob");
+    const blob = output.type === "application/pdf" ? output : new Blob([output], { type: "application/pdf" });
+    const now = new Date();
+    const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    const filename = `文件排版_${date}.pdf`;
+    const file = typeof File === "function" ? new File([blob], filename, { type: "application/pdf" }) : null;
+    documentState.pdfBundle = { blob, file, filename, objectUrl: null };
+    return documentState.pdfBundle;
+  }
+
+  function getDocumentPdfBundle() {
+    return documentState.pdfBundle || buildDocumentPdfBundle();
+  }
+
+  function documentPdfUrl(bundle) {
+    if (!bundle.objectUrl) bundle.objectUrl = URL.createObjectURL(bundle.blob);
+    return bundle.objectUrl;
+  }
+
+  function downloadDocumentPdf(bundle) {
+    const link = document.createElement("a");
+    link.href = documentPdfUrl(bundle);
+    link.download = bundle.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function openDocumentPdf(bundle) {
+    const url = documentPdfUrl(bundle);
+    const opened = window.open(url, "_blank");
+    if (!opened) {
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+  }
+
+  function isDocumentMobile() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  }
+
+  documentEl.pdfBtn.addEventListener("click", () => {
+    const bundle = getDocumentPdfBundle();
+    if (!bundle) {
+      documentToast("請先加入文件。");
+      return;
+    }
+    if (/SamsungBrowser\//i.test(navigator.userAgent)) downloadDocumentPdf(bundle);
+    else if (isDocumentMobile()) openDocumentPdf(bundle);
+    else downloadDocumentPdf(bundle);
+    documentLog(`已產生 ${documentState.documents.length} 頁 PDF：${bundle.filename}`);
+  });
+
+  documentEl.sharePdfBtn.addEventListener("click", async () => {
+    const bundle = getDocumentPdfBundle();
+    if (!bundle) {
+      documentToast("請先加入文件。");
+      return;
+    }
+    if (/SamsungBrowser\//i.test(navigator.userAgent)) {
+      openDocumentPdf(bundle);
+      documentToast("PDF 已開啟，請使用閱讀器的分享功能傳送。");
+      documentLog(`已開啟 ${documentState.documents.length} 頁 PDF`);
+      return;
+    }
+    if (bundle.file && typeof navigator.share === "function" && typeof navigator.canShare === "function" && navigator.canShare({ files: [bundle.file] })) {
+      try {
+        await navigator.share({ files: [bundle.file], title: "文件排版 PDF" });
+        documentLog(`已分享 ${documentState.documents.length} 頁 PDF`);
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        console.error("Document PDF share failed.", error);
+      }
+    }
+    downloadDocumentPdf(bundle);
+    documentToast("此瀏覽器無法直接分享，已改為下載 PDF。");
+    documentLog(`已下載 ${documentState.documents.length} 頁 PDF`);
+  });
+
+  [documentEl.orientation, documentEl.fitMode, documentEl.margin].forEach((control) =>
+    control.addEventListener("change", invalidateDocumentPdf)
+  );
+
+  renderDocuments();
+})();

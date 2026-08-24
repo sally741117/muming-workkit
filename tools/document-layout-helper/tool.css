@@ -27,6 +27,14 @@ body.crop-modal-open {
   overflow: hidden;
 }
 
+body.document-crop-modal-open {
+  position: fixed;
+  right: 0;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
 body.crop-handle-dragging {
   overscroll-behavior: none;
   touch-action: none;
@@ -173,6 +181,30 @@ button:disabled { opacity: .55; cursor: wait; }
   text-decoration: none;
 }
 
+.mode-switch {
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mode-switch button {
+  min-width: 112px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.mode-switch button.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.mode-panel[hidden] { display: none; }
+
 .button-link.primary { border-color: var(--accent); }
 .button-link:hover { filter: brightness(.95); }
 .button-link:focus-visible { outline: 3px solid rgba(17, 97, 93, .24); outline-offset: 2px; }
@@ -180,6 +212,159 @@ button:disabled { opacity: .55; cursor: wait; }
 .workspace {
   display: block;
 }
+
+.document-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 14px;
+  align-items: start;
+}
+
+.document-import-actions,
+.document-pdf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.document-drop-zone {
+  display: grid;
+  place-items: center;
+  min-height: 82px;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px dashed #9fb4af;
+  border-radius: 8px;
+  background: #f7faf9;
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.document-drop-zone:hover,
+.document-drop-zone:focus-visible,
+.document-drop-zone.drag-over {
+  border-color: var(--accent);
+  background: #edf8f5;
+  outline: 2px solid rgba(17, 97, 93, .14);
+  outline-offset: 1px;
+}
+
+.document-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.document-list.empty {
+  place-items: center;
+  min-height: 170px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.document-item {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.document-item-preview {
+  display: grid;
+  place-items: center;
+  min-height: 190px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  background: #eef2f1;
+  cursor: pointer;
+}
+
+.document-item-preview img {
+  display: block;
+  width: 100%;
+  height: 190px;
+  object-fit: contain;
+}
+
+.document-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.document-item-title {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.document-item-name {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-status {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.document-status.warn { color: var(--warn); }
+
+.document-item-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.document-item-actions button {
+  min-height: 31px;
+  padding: 0 5px;
+  font-size: 11px;
+}
+
+.document-layout-panel {
+  position: sticky;
+  top: 14px;
+}
+
+.document-layout-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.document-layout-controls label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.document-layout-controls select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.document-pdf-actions { margin-top: 14px; }
 
 .panel { padding: 16px; }
 .panel-head {
@@ -576,6 +761,8 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 
 #cropCanvas,
 #cropOverlay,
+#documentCropCanvas,
+#documentCropOverlay,
 .handle,
 .handle-hit {
   touch-action: none;
@@ -584,13 +771,15 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   -webkit-touch-callout: none;
 }
 
-#cropCanvas {
+#cropCanvas,
+#documentCropCanvas {
   max-width: 100%;
   max-height: 72vh;
   -webkit-user-drag: none;
 }
 
-#cropOverlay {
+#cropOverlay,
+#documentCropOverlay {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -622,7 +811,8 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 
 .handle.active { cursor: grabbing; }
 
-#cropCanvas:focus-visible {
+#cropCanvas:focus-visible,
+#documentCropCanvas:focus-visible {
   outline: 3px solid #f2b134;
   outline-offset: -3px;
 }
@@ -649,6 +839,8 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   .case-head { flex-direction: column; align-items: flex-start; }
   .case-head-actions { width: 100%; justify-content: flex-start; }
   .crop-grid { grid-template-columns: 1fr; }
+  .document-workspace { grid-template-columns: 1fr; }
+  .document-layout-panel { position: static; }
   .crop-dialog {
     width: calc(100vw - 12px);
     max-height: calc(100vh - 12px);
@@ -660,7 +852,8 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
     max-height: none;
     aspect-ratio: auto;
   }
-  #cropCanvas {
+  #cropCanvas,
+  #documentCropCanvas {
     display: block;
     width: auto;
     height: auto;
@@ -684,6 +877,21 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
     border-top: 1px solid var(--line);
     background: rgba(255, 255, 255, .98);
   }
+}
+
+@media (max-width: 600px) {
+  .mode-switch { display: flex; }
+  .mode-switch button { flex: 1; min-width: 0; }
+  .document-panel .panel-head { align-items: flex-start; }
+  .document-import-actions { width: 100%; }
+  .document-import-actions button { flex: 1; }
+  .document-drop-zone { min-height: 64px; }
+  .document-list { grid-template-columns: 1fr; }
+  .document-item { grid-template-columns: 104px minmax(0, 1fr); align-items: start; }
+  .document-item-preview { min-height: 138px; grid-row: span 3; }
+  .document-item-preview img { height: 124px; }
+  .document-item-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .document-pdf-actions button { flex: 1; }
 }
 
 @media (pointer: coarse) {
