@@ -665,6 +665,12 @@ function isMobilePdfEnvironment() {
     || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 }
 
+function isIOSLineInAppBrowser(userAgent = navigator.userAgent, maxTouchPoints = navigator.maxTouchPoints) {
+  const isIOS = /iPad|iPhone|iPod/i.test(userAgent)
+    || (/Macintosh/i.test(userAgent) && maxTouchPoints > 1);
+  return isIOS && inAppBrowserInfo(userAgent)?.id === "line";
+}
+
 function isSamsungInternet(userAgent = navigator.userAgent) {
   return /SamsungBrowser\//i.test(userAgent || "");
 }
@@ -2740,6 +2746,23 @@ function generatePdf(caseId) {
   if (isSamsungInternet()) {
     downloadPdf(bundle);
     log(`已下載 ${bundle.filename}`);
+    return;
+  }
+  if (isIOSLineInAppBrowser()) {
+    try {
+      if (!bundle.file
+        || typeof navigator.share !== "function"
+        || typeof navigator.canShare !== "function"
+        || !navigator.canShare({ files: [bundle.file] })) return;
+      navigator.share({
+        files: [bundle.file],
+        title: bundle.filename
+      }).catch((error) => {
+        if (error?.name !== "AbortError") console.error("PDF share failed.", error);
+      });
+    } catch (error) {
+      if (error?.name !== "AbortError") console.error("PDF share failed.", error);
+    }
     return;
   }
   if (isMobilePdfEnvironment()) {
