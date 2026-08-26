@@ -1,4 +1,4 @@
-const CACHE_NAME = "muming-workkit-v18";
+const CACHE_NAME = "muming-workkit-v19";
 const CACHE_PREFIX = "muming-workkit-";
 
 const HTML_ASSETS = [

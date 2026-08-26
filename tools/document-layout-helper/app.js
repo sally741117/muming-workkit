@@ -675,16 +675,21 @@ function isSamsungInternet(userAgent = navigator.userAgent) {
   return /SamsungBrowser\//i.test(userAgent || "");
 }
 
-function pdfPrimaryButtonLabel(userAgent = navigator.userAgent) {
+function pdfPrimaryButtonLabel(userAgent = navigator.userAgent, maxTouchPoints = navigator.maxTouchPoints) {
+  if (isIOSLineInAppBrowser(userAgent, maxTouchPoints)) return "PDF 分享／列印";
   return isSamsungInternet(userAgent) ? "下載 PDF" : "產生 PDF";
 }
 
 function shouldShowPdfShareAction(options = {}) {
   const userAgent = options.userAgent ?? navigator.userAgent;
+  const maxTouchPoints = options.maxTouchPoints ?? navigator.maxTouchPoints;
   const shareAvailable = options.shareAvailable ?? (typeof navigator.share === "function");
   const canShareAvailable = options.canShareAvailable ?? (typeof navigator.canShare === "function");
   // Samsung Internet 30 reports PDF sharing support but rejects PDF Files with NotAllowedError.
-  return !isSamsungInternet(userAgent) && shareAvailable && canShareAvailable;
+  return !isIOSLineInAppBrowser(userAgent, maxTouchPoints)
+    && !isSamsungInternet(userAgent)
+    && shareAvailable
+    && canShareAvailable;
 }
 
 function updatePdfActions() {
