@@ -64,7 +64,7 @@ const el = {
   cropCanvas: document.querySelector("#cropCanvas"),
   cropOverlay: document.querySelector("#cropOverlay"),
   cropHandleHint: document.querySelector("#cropHandleHint"),
-  correctedCanvas: document.querySelector("#correctedCanvas"),
+  cropCorrectionPreviewCanvas: document.querySelector("#cropCorrectionPreviewCanvas"),
   autoCropBtn: document.querySelector("#autoCropBtn"),
   redetectFrameBtn: document.querySelector("#redetectFrameBtn"),
   nextFrameBtn: document.querySelector("#nextFrameBtn"),
@@ -703,6 +703,7 @@ async function initEngines() {
     await waitForCv();
     state.cvReady = true;
     el.engineStatus.textContent = "影像引擎已就緒";
+    if (el.cropDialog.open && state.cropPoints.length === 4) updateCropCorrectionPreview();
   } catch {
     el.engineStatus.textContent = "影像引擎載入失敗，仍可人工裁切";
   }
@@ -2081,7 +2082,7 @@ async function openCrop(cardId, opener = document.activeElement) {
     fitOverlay();
     updateNextFrameButton();
     drawCropOverlay();
-    updateCorrectedPreview();
+    updateCropCorrectionPreview();
     el.applyCropBtn.focus();
   });
 }
@@ -2100,7 +2101,7 @@ function setCropCandidate(index, markDirty = true) {
   }
   updateNextFrameButton();
   drawCropOverlay();
-  updateCorrectedPreview();
+  updateCropCorrectionPreview();
 }
 
 function redetectCropCandidates() {
@@ -2254,7 +2255,7 @@ function moveActiveCropHandle(key, fast = false) {
   state.cropDirty = true;
   state.cropManuallyAdjusted = true;
   drawCropOverlay();
-  updateCorrectedPreview();
+  updateCropCorrectionPreview();
 }
 
 function updateDraggedCropPoint(clientX, clientY) {
@@ -2267,7 +2268,7 @@ function updateDraggedCropPoint(clientX, clientY) {
   state.cropDirty = true;
   state.cropManuallyAdjusted = true;
   drawCropOverlay();
-  updateCorrectedPreview();
+  updateCropCorrectionPreview();
 }
 
 function blockCropSurfaceTouch(event) {
@@ -2365,10 +2366,21 @@ el.cropOverlay.addEventListener("focusin", (event) => {
   if (handle) setActiveCropHandle(Number(handle.dataset.index));
 });
 
-function updateCorrectedPreview() {
-  if (!state.cvReady) return;
-  const out = warpCanvas(el.cropCanvas, orderPoints(state.cropPoints));
-  el.correctedCanvas.getContext("2d").drawImage(out, 0, 0, 850, 540);
+function createCropCorrectionResult() {
+  const orderedCrop = orderPoints(state.cropPoints);
+  return state.cvReady ? warpCanvas(el.cropCanvas, orderedCrop) : cloneCanvas(el.cropCanvas);
+}
+
+function updateCropCorrectionPreview() {
+  if (state.cropPoints.length !== 4) return null;
+  const output = createCropCorrectionResult();
+  const preview = el.cropCorrectionPreviewCanvas;
+  preview.width = output.width;
+  preview.height = output.height;
+  const context = preview.getContext("2d");
+  context.clearRect(0, 0, preview.width, preview.height);
+  context.drawImage(output, 0, 0);
+  return output;
 }
 
 function applyCropChanges() {
@@ -2381,7 +2393,7 @@ function applyCropChanges() {
     card.originalWidth,
     card.originalHeight
   );
-  const out = state.cvReady ? warpCanvas(el.cropCanvas, orderedCrop) : cloneCanvas(el.cropCanvas);
+  const out = createCropCorrectionResult();
   card.points = originalPixelsFromNormalized(normalizedCrop, card.originalWidth, card.originalHeight);
   card.lastAppliedCrop = { points: clonePoints(normalizedCrop), rotation: state.cropRotation };
   card.rotation = state.cropRotation;
@@ -2454,7 +2466,7 @@ el.resetCropBtn.addEventListener("click", async () => {
   state.cropManuallyAdjusted = false;
   fitOverlay();
   drawCropOverlay();
-  updateCorrectedPreview();
+  updateCropCorrectionPreview();
 });
 el.rotateLeftBtn.addEventListener("click", () => rotateSourceForCrop(-90));
 el.rotateRightBtn.addEventListener("click", () => rotateSourceForCrop(90));
@@ -2481,7 +2493,7 @@ async function rotateSourceForCrop(degrees) {
   updateNextFrameButton();
   fitOverlay();
   drawCropOverlay();
-  updateCorrectedPreview();
+  updateCropCorrectionPreview();
 }
 
 function cropFocusableElements() {

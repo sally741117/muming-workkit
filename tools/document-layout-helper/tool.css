@@ -969,8 +969,15 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   outline: 3px solid #f2b134;
   outline-offset: -3px;
 }
-.crop-preview canvas {
+.crop-correction-preview {
+  min-width: 0;
+}
+
+.crop-correction-preview canvas {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  height: auto;
   border: 1px solid var(--line);
   background: #eef2f1;
 }
@@ -1015,12 +1022,7 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
     max-height: 50vh;
     max-height: 50dvh;
   }
-  .crop-preview { min-width: 0; }
-  .crop-preview canvas {
-    display: block;
-    max-width: 100%;
-    height: auto;
-  }
+  .crop-correction-preview { min-width: 0; }
   .diagnostic-actions button { flex: 1 1 150px; }
   .crop-dialog > .dialog-shell > .dialog-actions {
     position: sticky;

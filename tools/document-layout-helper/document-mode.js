@@ -72,7 +72,7 @@
     cropCanvas: document.querySelector("#documentCropCanvas"),
     cropOverlay: document.querySelector("#documentCropOverlay"),
     cropHint: document.querySelector("#documentCropHint"),
-    correctedCanvas: document.querySelector("#documentCorrectedCanvas"),
+    cropCorrectionPreviewCanvas: document.querySelector("#documentCropCorrectionPreviewCanvas"),
     autoCropBtn: document.querySelector("#documentAutoCropBtn"),
     nextFrameBtn: document.querySelector("#documentNextFrameBtn"),
     rotateLeftBtn: document.querySelector("#documentRotateLeftBtn"),
@@ -185,6 +185,7 @@
   waitForDocumentCv().then(() => {
     documentState.cvReady = true;
     documentEl.engineStatus.textContent = "文件邊緣偵測已就緒";
+    if (documentEl.cropDialog.open && documentState.cropPoints.length === 4) updateDocumentCropCorrectionPreview();
   }).catch(() => {
     documentEl.engineStatus.textContent = "影像引擎載入失敗，仍可人工裁切";
   });
@@ -1267,7 +1268,7 @@
     requestAnimationFrame(() => {
       fitDocumentOverlay();
       drawDocumentOverlay();
-      updateDocumentCorrectedPreview();
+      updateDocumentCropCorrectionPreview();
       updateDocumentCandidateButton();
       updateDocumentCropHint();
       documentEl.applyCropBtn.focus();
@@ -1321,11 +1322,14 @@
     });
   }
 
-  function updateDocumentCorrectedPreview() {
+  function updateDocumentCropCorrectionPreview() {
     const output = warpDocumentCanvas(documentEl.cropCanvas, documentState.cropPoints);
-    documentEl.correctedCanvas.width = output.width;
-    documentEl.correctedCanvas.height = output.height;
-    documentEl.correctedCanvas.getContext("2d").drawImage(output, 0, 0);
+    const preview = documentEl.cropCorrectionPreviewCanvas;
+    preview.width = output.width;
+    preview.height = output.height;
+    const context = preview.getContext("2d");
+    context.clearRect(0, 0, preview.width, preview.height);
+    context.drawImage(output, 0, 0);
   }
 
   function updateDocumentCropHint() {
@@ -1376,7 +1380,7 @@
     documentState.cropPoints[documentState.dragHandle] = documentImagePoint(clientX, clientY);
     documentState.dirty = true;
     drawDocumentOverlay();
-    updateDocumentCorrectedPreview();
+    updateDocumentCropCorrectionPreview();
   }
 
   function blockDocumentTouch(event) {
@@ -1487,7 +1491,7 @@
     );
     documentState.dirty = true;
     drawDocumentOverlay();
-    updateDocumentCorrectedPreview();
+    updateDocumentCropCorrectionPreview();
   }
 
   documentEl.nextFrameBtn.addEventListener("click", () => setDocumentCandidate(documentState.candidateIndex + 1));
@@ -1510,7 +1514,7 @@
     documentState.dirty = true;
     fitDocumentOverlay();
     drawDocumentOverlay();
-    updateDocumentCorrectedPreview();
+    updateDocumentCropCorrectionPreview();
     updateDocumentCandidateButton();
   });
 
@@ -1534,7 +1538,7 @@
     documentState.dirty = true;
     fitDocumentOverlay();
     drawDocumentOverlay();
-    updateDocumentCorrectedPreview();
+    updateDocumentCropCorrectionPreview();
   }
 
   documentEl.rotateLeftBtn.addEventListener("click", () => void rotateDocumentCrop(-90));
@@ -1554,7 +1558,7 @@
     documentState.dirty = true;
     fitDocumentOverlay();
     drawDocumentOverlay();
-    updateDocumentCorrectedPreview();
+    updateDocumentCropCorrectionPreview();
   });
 
   function applyDocumentCrop() {
@@ -1634,7 +1638,7 @@
     };
     documentState.dirty = true;
     drawDocumentOverlay();
-    updateDocumentCorrectedPreview();
+    updateDocumentCropCorrectionPreview();
   }
 
   documentEl.cropDialog.addEventListener("keydown", (event) => {
