@@ -4,7 +4,7 @@ const CARD_H_MM = 54;
 const A4_W = 210;
 const A4_H = 297;
 const TOOL_CANONICAL_URL = "https://sally741117.github.io/muming-workkit/tools/document-layout-helper/";
-const TOOL_LINE_SHARE_URL = `${TOOL_CANONICAL_URL}?openExternalBrowser=1`;
+const TOOL_ANDROID_EXTERNAL_URL = `${TOOL_CANONICAL_URL}?openExternalBrowser=1`;
 const state = {
   cards: [],
   cases: [],
@@ -352,7 +352,7 @@ function refreshDiagnosticCapabilities(bundle = null) {
         diagnosticState.pdf.canShareUrl = Boolean(navigator.canShare({
           title: "MUMING",
           text: "PDF Share Test",
-          url: TOOL_LINE_SHARE_URL
+          url: TOOL_CANONICAL_URL
         }));
       } catch (error) {
         diagnosticState.pdf.canShareUrlErrorName = error?.name || "Error";
@@ -422,7 +422,7 @@ function testDiagnosticUrlShare() {
     }
     const sharePromise = navigator.share({
       title: "MUMING Share Test",
-      url: window.location.href
+      url: TOOL_CANONICAL_URL
     });
     diagnosticState.urlShare.clickToShareMs = Number((performance.now() - startedAt).toFixed(2));
     el.testUrlShareBtn.disabled = true;
@@ -616,25 +616,39 @@ function initDiagnostics() {
   void prepareDiagnosticImage();
 }
 
-function shouldShowLineAndroidFallback(options = {}) {
+function shouldUseAndroidLineExternalBrowser(options = {}) {
   const userAgent = options.userAgent ?? navigator.userAgent;
   const shareAvailable = options.shareAvailable ?? (typeof navigator.share === "function");
   const debugMode = options.debugMode ?? diagnosticEnabled;
   return !debugMode
     && /Android/i.test(userAgent)
+    && !/iPad|iPhone|iPod/i.test(userAgent)
     && inAppBrowserInfo(userAgent)?.id === "line"
     && !shareAvailable;
 }
 
+function hasAndroidExternalBrowserGuard(url = window.location.href) {
+  try {
+    return new URL(url, TOOL_CANONICAL_URL).searchParams.get("openExternalBrowser") === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
 function initLineAndroidFallback() {
-  el.openExternalBrowserLink.href = TOOL_LINE_SHARE_URL;
-  if (!shouldShowLineAndroidFallback()) return;
+  el.openExternalBrowserLink.href = TOOL_ANDROID_EXTERNAL_URL;
+  if (!shouldUseAndroidLineExternalBrowser()) return false;
+  if (!hasAndroidExternalBrowserGuard()) {
+    window.location.replace(TOOL_ANDROID_EXTERNAL_URL);
+    return true;
+  }
   el.lineAndroidFallbackDialog.showModal();
   requestAnimationFrame(() => el.openExternalBrowserLink.focus());
+  return false;
 }
 
 el.copyExternalUrlBtn.addEventListener("click", async () => {
-  const copied = await copyText(TOOL_LINE_SHARE_URL);
+  const copied = await copyText(TOOL_CANONICAL_URL);
   showToast(copied
     ? "網址已複製，請貼到 Chrome 或其他瀏覽器開啟。"
     : "無法自動複製，請長按網址後複製。"
@@ -2870,9 +2884,10 @@ async function sharePdf(caseId, button) {
   }
 }
 
-initUploadEnvironment();
-addDefaultCase();
-renderAll();
-initLineAndroidFallback();
-initDiagnostics();
-initEngines();
+if (!initLineAndroidFallback()) {
+  initUploadEnvironment();
+  addDefaultCase();
+  renderAll();
+  initDiagnostics();
+  initEngines();
+}
