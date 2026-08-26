@@ -2695,8 +2695,17 @@ function pdfObjectUrl(bundle) {
   return bundle.objectUrl;
 }
 
-function openPdfPreview(bundle) {
+function openPdfPreview(bundle, reservedWindow = null) {
   const url = pdfObjectUrl(bundle);
+  if (reservedWindow && !reservedWindow.closed) {
+    try {
+      reservedWindow.location.replace(url);
+      reservedWindow.opener = null;
+      return;
+    } catch (_) {
+      try { reservedWindow.close(); } catch (_) { /* The reserved window may already be unavailable. */ }
+    }
+  }
   const opened = window.open(url, "_blank");
   if (opened) {
     try { opened.opener = null; } catch (_) { /* Cross-window restrictions are harmless here. */ }
@@ -2721,15 +2730,29 @@ function downloadPdf(bundle) {
 }
 
 function generatePdf(caseId) {
-  const bundle = getPdfBundle(caseId);
-  if (!bundle) return;
-  if (isSamsungInternet()) {
+  if (!rowsForCase(caseId).length) return;
+  const samsung = isSamsungInternet();
+  const mobileViewer = !samsung && isMobilePdfEnvironment();
+  // iOS WebViews require the viewer window to be created directly inside the click gesture.
+  const reservedWindow = mobileViewer ? window.open("", "_blank") : null;
+  let bundle = null;
+  try {
+    bundle = getPdfBundle(caseId);
+  } catch (error) {
+    try { reservedWindow?.close(); } catch (_) { /* The reserved window may already be unavailable. */ }
+    throw error;
+  }
+  if (!bundle) {
+    try { reservedWindow?.close(); } catch (_) { /* The reserved window may already be unavailable. */ }
+    return;
+  }
+  if (samsung) {
     downloadPdf(bundle);
     log(`已下載 ${bundle.filename}`);
     return;
   }
-  if (isMobilePdfEnvironment()) {
-    openPdfPreview(bundle);
+  if (mobileViewer) {
+    openPdfPreview(bundle, reservedWindow);
     log("PDF 已開啟，可使用瀏覽器分享或儲存到檔案");
     return;
   }
