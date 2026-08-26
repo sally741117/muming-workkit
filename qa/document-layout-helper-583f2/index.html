@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>證件排版小幫手 | MUMING WorkKit</title>
+  <meta name="description" content="身分證、居留證照片自動裁切、校正與 A4 排版，完成後直接輸出 PDF。">
+  <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
+  <link rel="stylesheet" href="./tool.css?v=583f2a0">
+  <script src="./vendor/pdf.min.js?v=583f2a0"></script>
+  <script async src="./vendor/opencv.js?v=583f2a0"></script>
+  <script src="./vendor/jspdf.umd.min.js?v=583f2a0"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="brand"><a class="brand-link" href="../../index.html">MUMING WorkKit</a></p>
+      <h1>證件排版小幫手</h1>
+    </div>
+    <p class="privacy">證件僅於本機瀏覽器處理，不會上傳或儲存。</p>
+  </header>
+
+  <p style="margin:6px 20px 0;color:#667085;font-size:12px;text-align:center">Legacy baseline: 583f2a0</p>
+
+  <main>
+    <section class="steps" aria-label="流程">
+      <span class="active">1 上傳</span>
+      <span>2 自動裁切</span>
+      <span>3 確認</span>
+      <span>4 分組</span>
+      <span>5 PDF</span>
+    </section>
+
+    <section id="diagnosticPanel" class="panel diagnostic-panel" aria-labelledby="diagnosticTitle" hidden>
+      <div class="panel-head">
+        <div>
+          <h2 id="diagnosticTitle">Android 能力診斷</h2>
+          <p>依序測試立即分享網址與預建 PDF；只記錄能力與錯誤，不包含證件內容。</p>
+        </div>
+        <button id="refreshDiagnosticBtn" type="button">重新檢測</button>
+      </div>
+      <pre id="diagnosticOutput" class="diagnostic-output" aria-live="polite"></pre>
+      <figure id="diagnosticImagePreview" class="diagnostic-image-preview" hidden>
+        <img id="diagnosticImagePreviewImg" alt="MUMING Image Share Test 測試圖片預覽">
+        <figcaption>實際分享的 600 × 400 PNG</figcaption>
+      </figure>
+      <div class="diagnostic-actions">
+        <button id="testUrlShareBtn" class="primary" type="button">立即分享網址</button>
+        <button id="testPdfShareBtn" class="primary" type="button">立即分享預建 PDF</button>
+        <button id="testImageShareBtn" class="primary" type="button" disabled>準備測試圖片…</button>
+        <button id="testBlobDownloadBtn" type="button">測試 Blob 下載</button>
+        <button id="testBlobOpenBtn" type="button">測試開啟 Blob PDF</button>
+        <button id="copyDiagnosticBtn" type="button">複製診斷結果</button>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <section class="panel cases-panel">
+        <div class="panel-head">
+          <div>
+            <h2>案件工作區</h2>
+            <p id="engineStatus" class="engine">影像引擎載入中...</p>
+          </div>
+          <button id="addCaseBtn" class="ghost" type="button">＋新增下一組案件</button>
+        </div>
+        <p id="androidUploadHint" class="android-upload-hint" hidden>若沒有顯示相簿，請點「我的檔案」或「Files」，再選擇圖片。</p>
+        <div id="statusLog" class="status-log" aria-live="polite"></div>
+        <div id="cases"></div>
+      </section>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <a href="../../index.html">© 2026 MUMING 牧茗製作</a>
+  </footer>
+
+  <dialog id="lineAndroidFallbackDialog" class="line-android-fallback-dialog">
+    <div class="dialog-shell">
+      <div class="dialog-head">
+        <h2>請使用瀏覽器開啟</h2>
+        <button id="closeLineFallbackBtn" class="icon" aria-label="關閉" type="button">×</button>
+      </div>
+      <p>此 Android LINE 瀏覽器無法分享 PDF，請使用瀏覽器開啟。</p>
+      <div class="dialog-actions line-fallback-actions">
+        <a id="openExternalBrowserLink" class="button-link primary" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/?openExternalBrowser=1">開啟外部瀏覽器</a>
+        <button id="copyExternalUrlBtn" type="button">複製網址</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="cropDialog" class="crop-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <div class="crop-dialog-title">
+          <h2>調整裁切</h2>
+          <span id="cropAssignmentContext" hidden></span>
+        </div>
+        <button class="icon" value="cancel" aria-label="關閉" type="button" data-crop-cancel tabindex="-1">×</button>
+      </div>
+      <div class="crop-tools">
+        <button id="autoCropBtn" class="primary" type="button">✨ 一鍵自動裁切</button>
+        <button id="redetectFrameBtn" type="button">重新找外框</button>
+        <button id="nextFrameBtn" type="button" hidden>下一個外框</button>
+        <button id="rotateLeftBtn" type="button">向左 90°</button>
+        <button id="rotateRightBtn" type="button">向右 90°</button>
+        <button id="rotate180Btn" type="button">旋轉 180°</button>
+        <button id="resetCropBtn" type="button">還原原始裁切</button>
+      </div>
+      <div class="crop-grid">
+        <div class="crop-source">
+          <div class="crop-stage">
+            <canvas id="cropCanvas" tabindex="0" aria-label="裁切影像"></canvas>
+            <svg id="cropOverlay"></svg>
+          </div>
+          <p id="cropHandleHint" class="crop-handle-hint">
+            <span class="keyboard-crop-hint">使用方向鍵微調，Shift＋方向鍵快速移動</span>
+            <span class="touch-crop-hint">拖曳四角調整裁切範圍</span>
+          </p>
+        </div>
+        <div class="crop-preview">
+          <h3>校正預覽</h3>
+          <canvas id="correctedCanvas" width="850" height="540"></canvas>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button value="cancel" type="button" data-crop-cancel>取消</button>
+        <button id="applyCropBtn" class="primary" value="default" type="button">套用</button>
+      </div>
+      <div id="discardCropPrompt" class="discard-crop-prompt" hidden>
+        <div class="discard-crop-box" role="alertdialog" aria-modal="true" aria-labelledby="discardCropTitle">
+          <h3 id="discardCropTitle">放棄尚未套用的修改？</h3>
+          <p>四角位置與旋轉變更尚未套用。</p>
+          <div class="dialog-actions">
+            <button id="keepEditingCropBtn" type="button">繼續編輯</button>
+            <button id="discardCropBtn" class="danger" type="button">放棄修改</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="cardChoiceDialog" class="card-choice-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <div>
+          <h2>選擇要放入的證件</h2>
+          <p id="cardChoiceContext" class="dialog-context"></p>
+        </div>
+        <button id="cancelCardChoiceBtn" class="icon" value="cancel" aria-label="關閉" type="button">×</button>
+      </div>
+      <div id="cardChoiceOptions" class="card-choice-options"></div>
+      <div class="dialog-actions">
+        <button type="button" data-choice-cancel>取消</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="replaceDialog" class="replace-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <h2>此位置已有證件</h2>
+      </div>
+      <p>要取代嗎？</p>
+      <div class="dialog-actions">
+        <button id="cancelReplaceBtn" value="cancel" type="button">取消</button>
+        <button id="confirmReplaceBtn" class="primary" value="default" type="button">取代</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="viewerDialog" class="viewer-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-head">
+        <h2>查看證件</h2>
+        <button class="icon" value="cancel" aria-label="關閉" type="submit">×</button>
+      </div>
+      <div class="viewer-switch">
+        <button id="viewOriginalBtn" type="button" class="active">原始</button>
+        <button id="viewEnhancedBtn" type="button">自然增強</button>
+      </div>
+      <img id="viewerImage" alt="證件大圖">
+    </form>
+  </dialog>
+
+  <input id="slotGalleryInput" type="file" accept="image/*" hidden>
+  <input id="slotPdfInput" type="file" accept="application/pdf,.pdf" hidden>
+  <input id="slotMixedInput" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" hidden>
+
+  <script src="./app.js?v=583f2a0"></script>
+</body>
+</html>
