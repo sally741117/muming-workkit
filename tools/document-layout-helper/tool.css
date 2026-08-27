@@ -993,6 +993,16 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   background: #eef2f1;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  #cropDialog .identity-crop-stage {
+    overflow: visible;
+  }
+
+  #cropDialog .identity-crop-stage #cropOverlay {
+    z-index: 2;
+  }
+}
+
 @media (max-width: 920px) {
   .topbar { grid-template-columns: 1fr; align-items: start; }
   .topbar { display: grid; }
