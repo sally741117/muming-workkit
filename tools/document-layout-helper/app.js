@@ -24,7 +24,6 @@ const state = {
   cropPageScrollY: 0,
   viewerId: null,
   viewerMode: "original",
-  selectedCardId: null,
   slotChoice: null,
   replaceRequest: null,
   fileChooserCallbacks: {},
@@ -759,7 +758,6 @@ function renderAll() {
 function cardNode(card, compact = false) {
   const node = document.createElement("article");
   node.className = "card";
-  if (state.selectedCardId === card.id) node.classList.add("selected-card");
   node.draggable = true;
   node.dataset.cardId = card.id;
   const showSideHint = compact && !findSlotForCard(card.id);
@@ -779,11 +777,19 @@ function cardNode(card, compact = false) {
         : '<button type="button" data-action="crop">調整裁切</button><button type="button" data-action="redetect">重新自動裁切</button><button type="button" data-action="rotatel">左轉</button><button type="button" data-action="rotater">右轉</button><button type="button" data-action="replace">替換</button><button type="button" data-action="slotremove">移除</button>'}
     </div>`;
   node.addEventListener("dragstart", (event) => {
+    if (event.target.closest("button, .slot-card-preview")) {
+      event.preventDefault();
+      return;
+    }
     event.dataTransfer.setData("text/plain", card.id);
     event.dataTransfer.effectAllowed = "move";
   });
+  node.addEventListener("dragend", () => {
+    if (state.pointerDrag?.cardId === card.id) state.pointerDrag = null;
+    node.classList.remove("dragging-card");
+  });
   node.addEventListener("pointerdown", (event) => {
-    if (event.target.closest("button")) return;
+    if (event.target.closest("button, .slot-card-preview")) return;
     state.pointerDrag = { cardId: card.id, x: event.clientX, y: event.clientY, moved: false };
     node.setPointerCapture(event.pointerId);
   });
@@ -807,6 +813,11 @@ function cardNode(card, compact = false) {
       assignCard(card.id, slot.dataset.caseId, slot.dataset.personId, slot.dataset.side);
     }
   });
+  node.addEventListener("pointercancel", () => {
+    if (state.pointerDrag?.cardId !== card.id) return;
+    state.pointerDrag = null;
+    node.classList.remove("dragging-card");
+  });
   node.addEventListener("click", (event) => {
     const action = event.target.closest("button")?.dataset.action;
     if (!action) {
@@ -823,11 +834,6 @@ function cardNode(card, compact = false) {
     if (action === "replace") replaceCardImage(card.id);
     if (action === "remove") removeCard(card.id);
     if (action === "slotremove") removeCard(card.id);
-  });
-  node.addEventListener("click", (event) => {
-    if (event.target.closest("button") || (!compact && event.target.closest(".slot-card-preview"))) return;
-    state.selectedCardId = state.selectedCardId === card.id ? null : card.id;
-    renderAll();
   });
   return node;
 }
@@ -930,13 +936,8 @@ function wireSlot(slot) {
       chooseFilesForSlot(slot, "pdf");
       return;
     }
-    if (!state.selectedCardId) {
-      if (slot.querySelector(".card")) return;
-      chooseFilesForSlot(slot, usesMobileImageChooser() ? "gallery" : "mixed");
-      return;
-    }
-    assignCard(state.selectedCardId, slot.dataset.caseId, slot.dataset.personId, slot.dataset.side);
-    state.selectedCardId = null;
+    if (slot.querySelector(".card")) return;
+    chooseFilesForSlot(slot, usesMobileImageChooser() ? "gallery" : "mixed");
   });
   slot.addEventListener("dragover", (event) => {
     event.preventDefault();
@@ -2201,7 +2202,7 @@ function drawCropOverlay() {
   if (el.cropOverlay.querySelectorAll(".handle").length !== 4) {
     el.cropOverlay.innerHTML = `
       <polygon fill="rgba(17,97,93,.18)" stroke="#30c2b3" stroke-width="2"></polygon>
-      ${pts.map((p, i) => `<g class="handle" data-index="${i}" tabindex="0" role="slider" aria-label="${labels[i]}"><circle class="handle-hit" r="22"></circle><circle class="handle-dot" r="9" fill="#fff" stroke="#11615d" stroke-width="3"></circle></g>`).join("")}`;
+      ${pts.map((p, i) => `<g class="handle" data-index="${i}" tabindex="0" role="slider" aria-label="${labels[i]}"><circle class="handle-hit" r="26"></circle><circle class="handle-dot" r="9" fill="#fff" stroke="#11615d" stroke-width="3"></circle></g>`).join("")}`;
   }
   el.cropOverlay.querySelector("polygon").setAttribute("points", pts.map((p) => `${p.x},${p.y}`).join(" "));
   el.cropOverlay.querySelectorAll(".handle").forEach((handle, index) => {
@@ -2301,13 +2302,37 @@ function blockCropSurfaceTouch(event) {
   event.stopPropagation();
 }
 
-[el.cropCanvas, el.cropCanvas.parentElement].forEach((surface) => {
-  surface.addEventListener("touchstart", blockCropSurfaceTouch, { passive: false });
-  surface.addEventListener("touchmove", blockCropSurfaceTouch, { passive: false });
-});
+const identityCropStage = el.cropCanvas.parentElement;
+const coarseCropHandleRadius = 30;
 
-el.cropOverlay.addEventListener("pointerdown", (event) => {
-  const handle = event.target.closest?.(".handle");
+function nearestCropHandle(clientX, clientY) {
+  const rect = el.cropCanvas.getBoundingClientRect();
+  let nearestIndex = null;
+  let nearestDistance = coarseCropHandleRadius;
+  state.cropPoints.map(displayPoint).forEach((point, index) => {
+    const distance = Math.hypot(clientX - (rect.left + point.x), clientY - (rect.top + point.y));
+    if (distance <= nearestDistance) {
+      nearestIndex = index;
+      nearestDistance = distance;
+    }
+  });
+  return nearestIndex === null
+    ? null
+    : el.cropOverlay.querySelector(`.handle[data-index="${nearestIndex}"]`);
+}
+
+function cropHandleFromInput(event, allowNearest = false) {
+  const directHandle = event.target.closest?.(".handle");
+  if (directHandle) return directHandle;
+  return allowNearest ? nearestCropHandle(event.clientX, event.clientY) : null;
+}
+
+identityCropStage.addEventListener("touchstart", blockCropSurfaceTouch, { passive: false });
+identityCropStage.addEventListener("touchmove", blockCropSurfaceTouch, { passive: false });
+
+identityCropStage.addEventListener("pointerdown", (event) => {
+  const coarsePointer = event.pointerType === "touch" || window.matchMedia?.("(pointer: coarse)").matches;
+  const handle = cropHandleFromInput(event, coarsePointer);
   if (!handle) return;
   if (event.cancelable) event.preventDefault();
   event.stopPropagation();
@@ -2326,7 +2351,7 @@ el.cropOverlay.addEventListener("pointerdown", (event) => {
     // Synthetic events may not represent an active pointer; real input still uses capture.
   }
 }, { passive: false });
-el.cropOverlay.addEventListener("pointermove", (event) => {
+identityCropStage.addEventListener("pointermove", (event) => {
   if (activeCropInputMode !== "pointer" || draggingHandle === null || event.pointerId !== draggingPointerId) return;
   if (event.cancelable) event.preventDefault();
   event.stopPropagation();
@@ -2340,17 +2365,17 @@ function endCropPointer(event) {
   clearCropPointerDrag(event.pointerId);
 }
 
-el.cropOverlay.addEventListener("pointerup", endCropPointer);
-el.cropOverlay.addEventListener("pointercancel", endCropPointer);
-el.cropOverlay.addEventListener("lostpointercapture", () => {
+identityCropStage.addEventListener("pointerup", endCropPointer);
+identityCropStage.addEventListener("pointercancel", endCropPointer);
+identityCropStage.addEventListener("lostpointercapture", () => {
   if (activeCropInputMode === "pointer" && draggingHandle !== null) clearCropPointerDrag();
 });
-el.cropOverlay.addEventListener("touchstart", (event) => {
+identityCropStage.addEventListener("touchstart", (event) => {
   blockCropSurfaceTouch(event);
-  const handle = event.target.closest?.(".handle");
-  if (!handle || activeCropInputMode === "pointer" || draggingHandle !== null) return;
   const touch = event.changedTouches[0];
   if (!touch) return;
+  const handle = cropHandleFromInput({ target: event.target, clientX: touch.clientX, clientY: touch.clientY }, true);
+  if (!handle || activeCropInputMode === "pointer" || draggingHandle !== null) return;
   activeCropInputMode = "touch";
   draggingHandle = Number(handle.dataset.index);
   draggingTouchId = touch.identifier;
@@ -2359,7 +2384,7 @@ el.cropOverlay.addEventListener("touchstart", (event) => {
   setActiveCropHandle(draggingHandle);
   setCropDragging(true);
 }, { passive: false });
-el.cropOverlay.addEventListener("touchmove", (event) => {
+identityCropStage.addEventListener("touchmove", (event) => {
   blockCropSurfaceTouch(event);
   if (activeCropInputMode !== "touch" || draggingHandle === null) return;
   const touch = Array.from(event.touches).find((item) => item.identifier === draggingTouchId);
@@ -2375,15 +2400,15 @@ function endCropTouch(event) {
   if (cropDragMoved) suppressCropClickUntil = performance.now() + 500;
   clearCropPointerDrag(null);
 }
-el.cropOverlay.addEventListener("touchend", endCropTouch, { passive: false });
-el.cropOverlay.addEventListener("touchcancel", endCropTouch, { passive: false });
-el.cropOverlay.addEventListener("click", (event) => {
+identityCropStage.addEventListener("touchend", endCropTouch, { passive: false });
+identityCropStage.addEventListener("touchcancel", endCropTouch, { passive: false });
+identityCropStage.addEventListener("click", (event) => {
   if (performance.now() > suppressCropClickUntil) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   suppressCropClickUntil = 0;
 }, true);
-el.cropOverlay.addEventListener("contextmenu", (event) => {
+identityCropStage.addEventListener("contextmenu", (event) => {
   if (draggingHandle !== null) event.preventDefault();
 });
 el.cropOverlay.addEventListener("focusin", (event) => {
