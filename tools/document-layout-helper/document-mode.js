@@ -30,7 +30,8 @@
     pdfWarmTimer: null,
     pdfWarmIdle: null,
     layoutGesture: null,
-    layoutScrollY: 0
+    layoutScrollY: 0,
+    pendingImport: null
   };
 
   const documentEl = {
@@ -120,6 +121,12 @@
     for (const page of documentState.pages) {
       const item = page.documents.find((documentItem) => documentItem.id === itemId);
       if (item) return { page, item };
+    }
+    if (documentState.pendingImport?.item.id === itemId) {
+      return {
+        page: documentState.pendingImport.page,
+        item: documentState.pendingImport.item
+      };
     }
     return { page: null, item: null };
   }
@@ -632,6 +639,31 @@
     }
   }
 
+  function setInitialDocumentLayout(item, page) {
+    const correctedRatio = item.currentCanvas.width / Math.max(1, item.currentCanvas.height);
+    let layoutWidthMm = DEFAULT_DOCUMENT_WIDTH_MM;
+    let layoutHeightMm = layoutWidthMm / correctedRatio;
+    if (layoutHeightMm > DEFAULT_DOCUMENT_HEIGHT_MM) {
+      layoutHeightMm = DEFAULT_DOCUMENT_HEIGHT_MM;
+      layoutWidthMm = layoutHeightMm * correctedRatio;
+    }
+    const cascadeOffset = (page.documents.length % 5) * 4.5;
+    item.layout = {
+      xMm: Math.min(A4_WIDTH_MM - layoutWidthMm, Math.max(0, (A4_WIDTH_MM - layoutWidthMm) / 2 + cascadeOffset)),
+      yMm: Math.min(A4_HEIGHT_MM - layoutHeightMm, Math.max(0, (A4_HEIGHT_MM - layoutHeightMm) / 2 + cascadeOffset)),
+      widthMm: layoutWidthMm,
+      heightMm: layoutHeightMm,
+      lockRatio: true
+    };
+  }
+
+  function confirmInitialDocumentCrop(page, item, opener) {
+    return new Promise((resolve) => {
+      documentState.pendingImport = { page, item, resolve };
+      openDocumentCrop(item.id, opener);
+    });
+  }
+
   async function importDocumentFiles(fileList) {
     const files = [...fileList].filter((file) => file.type.startsWith("image/"));
     if (!files.length) return;
@@ -646,14 +678,6 @@
         const currentCanvas = best ? warpDocumentCanvas(sourceCanvas, points) : cloneDocumentCanvas(sourceCanvas);
         const normalized = normalizedDocumentPoints(points, sourceCanvas.width, sourceCanvas.height);
         const page = ensureDocumentPage();
-        const correctedRatio = currentCanvas.width / Math.max(1, currentCanvas.height);
-        let layoutWidthMm = DEFAULT_DOCUMENT_WIDTH_MM;
-        let layoutHeightMm = layoutWidthMm / correctedRatio;
-        if (layoutHeightMm > DEFAULT_DOCUMENT_HEIGHT_MM) {
-          layoutHeightMm = DEFAULT_DOCUMENT_HEIGHT_MM;
-          layoutWidthMm = layoutHeightMm * correctedRatio;
-        }
-        const cascadeOffset = (page.documents.length % 5) * 4.5;
         const item = {
           id: documentUid(),
           name: file.name,
@@ -671,17 +695,10 @@
           autoDetected: Boolean(best),
           manuallyAdjusted: false,
           status: best ? "已自動裁切" : "建議手動調整",
-          layout: {
-            xMm: Math.min(A4_WIDTH_MM - layoutWidthMm, Math.max(0, (A4_WIDTH_MM - layoutWidthMm) / 2 + cascadeOffset)),
-            yMm: Math.min(A4_HEIGHT_MM - layoutHeightMm, Math.max(0, (A4_HEIGHT_MM - layoutHeightMm) / 2 + cascadeOffset)),
-            widthMm: layoutWidthMm,
-            heightMm: layoutHeightMm,
-            lockRatio: true
-          }
+          layout: null
         };
-        page.documents.push(item);
-        documentState.selectedItemId = item.id;
-        documentLog(`${file.name}：${best ? "已找到文件外框" : "未找到明確外框，已保留原圖"}`);
+        const applied = await confirmInitialDocumentCrop(page, item, documentEl.selectBtn);
+        documentLog(`${file.name}：${applied ? "已確認裁切並加入 A4" : "已取消新增"}`);
       } catch (error) {
         console.error("Document import failed.", error);
         documentLog(`${file.name} 處理失敗，已略過`);
@@ -1261,7 +1278,9 @@
       item.originalWidth,
       item.originalHeight
     );
-    documentEl.cropContext.textContent = `第 ${documentState.pages.indexOf(page) + 1} 頁｜文件 ${page.documents.indexOf(item) + 1}｜${item.name}`;
+    const pending = documentState.pendingImport?.item.id === item.id;
+    const documentNumber = pending ? page.documents.length + 1 : page.documents.indexOf(item) + 1;
+    documentEl.cropContext.textContent = `第 ${documentState.pages.indexOf(page) + 1} 頁｜文件 ${documentNumber}｜${item.name}`;
     documentEl.discardPrompt.hidden = true;
     lockDocumentBackground();
     documentEl.cropDialog.showModal();
@@ -1572,19 +1591,25 @@
     item.candidateIndex = documentState.candidateIndex;
     item.currentCanvas = warpDocumentCanvas(documentEl.cropCanvas, points);
     item.currentDataUrl = item.currentCanvas.toDataURL("image/jpeg", 0.94);
-    if (item.layout?.lockRatio) {
-      item.layout.heightMm = item.layout.widthMm / (item.currentCanvas.width / Math.max(1, item.currentCanvas.height));
-      clampDocumentLayout(item);
-    }
     item.manuallyAdjusted = true;
     item.status = "已完成裁切";
     item.autoDetected = true;
     documentState.dirty = false;
     invalidateDocumentPdf();
+    return item;
   }
 
   documentEl.applyCropBtn.addEventListener("click", () => {
-    applyDocumentCrop();
+    const item = applyDocumentCrop();
+    const pending = documentState.pendingImport;
+    if (item && pending?.item.id === item.id) {
+      setInitialDocumentLayout(item, pending.page);
+      pending.page.documents.push(item);
+      documentState.selectedItemId = item.id;
+      documentState.pendingImport = null;
+      invalidateDocumentPdf();
+      pending.resolve(true);
+    }
     documentEl.cropDialog.close();
     renderDocumentEditor();
   });
@@ -1674,6 +1699,11 @@
 
   documentEl.cropDialog.addEventListener("close", () => {
     const opener = documentState.opener;
+    const pending = documentState.pendingImport;
+    if (pending?.item.id === documentState.activeId) {
+      documentState.pendingImport = null;
+      pending.resolve(false);
+    }
     clearDocumentDrag();
     unlockDocumentBackground();
     documentState.activeId = null;
