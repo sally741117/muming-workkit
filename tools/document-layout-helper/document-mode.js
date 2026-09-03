@@ -36,7 +36,9 @@
     cropDragClientPoint: null,
     cropPreviewTimer: null,
     cropPreviewLastAt: 0,
-    cropDragPreviewSource: null
+    cropDragPreviewSource: null,
+    dragOrigin: null,
+    dragUsesRelativeMotion: false
   };
 
   const documentEl = {
@@ -78,7 +80,9 @@
     cropStage: document.querySelector("#documentCropStage"),
     cropCanvas: document.querySelector("#documentCropCanvas"),
     cropOverlay: document.querySelector("#documentCropOverlay"),
+    cropLoupe: document.querySelector("#documentCropLoupe"),
     cropHint: document.querySelector("#documentCropHint"),
+    cropPreviewToggleBtn: document.querySelector("#documentCropPreviewToggleBtn"),
     cropCorrectionPreviewCanvas: document.querySelector("#documentCropCorrectionPreviewCanvas"),
     autoCropBtn: document.querySelector("#documentAutoCropBtn"),
     nextFrameBtn: document.querySelector("#documentNextFrameBtn"),
@@ -87,6 +91,7 @@
     rotate180Btn: document.querySelector("#documentRotate180Btn"),
     resetCropBtn: document.querySelector("#documentResetCropBtn"),
     applyCropBtn: document.querySelector("#documentApplyCropBtn"),
+    mobileApplyCropBtn: document.querySelector("#documentMobileApplyCropBtn"),
     discardPrompt: document.querySelector("#documentDiscardPrompt"),
     keepEditingBtn: document.querySelector("#documentKeepEditingBtn"),
     discardBtn: document.querySelector("#documentDiscardBtn")
@@ -95,6 +100,9 @@
   const HANDLE_LABELS = ["左上角", "右上角", "右下角", "左下角"];
   const DOCUMENT_CROP_PREVIEW_INTERVAL_MS = 100;
   const DOCUMENT_CROP_DRAG_PREVIEW_MAX_EDGE = 900;
+  const DOCUMENT_CROP_TOUCH_OFFSET_PX = 28;
+  const DOCUMENT_CROP_LOUPE_SIZE_PX = 128;
+  const DOCUMENT_CROP_LOUPE_ZOOM = 2.75;
   const A4_WIDTH_MM = 210;
   const A4_HEIGHT_MM = 297;
   const DEFAULT_DOCUMENT_WIDTH_MM = 175;
@@ -1292,6 +1300,7 @@
     const documentNumber = pending ? page.documents.length + 1 : page.documents.indexOf(item) + 1;
     documentEl.cropContext.textContent = `第 ${documentState.pages.indexOf(page) + 1} 頁｜文件 ${documentNumber}｜${item.name}`;
     documentEl.discardPrompt.hidden = true;
+    setDocumentCropPreviewOpen(false);
     lockDocumentBackground();
     documentEl.cropDialog.showModal();
     requestAnimationFrame(() => {
@@ -1300,7 +1309,7 @@
       updateDocumentCropCorrectionPreview();
       updateDocumentCandidateButton();
       updateDocumentCropHint();
-      documentEl.applyCropBtn.focus();
+      (documentCropUsesMobileLayout() ? documentEl.mobileApplyCropBtn : documentEl.applyCropBtn).focus();
     });
   }
 
@@ -1339,6 +1348,7 @@
         ${points.map((point, index) => `
           <g class="handle document-handle" data-index="${index}" tabindex="0" role="slider" aria-label="${HANDLE_LABELS[index]}">
             <circle class="handle-hit" r="22"></circle>
+            <circle class="document-touch-handle-hit" cy="${DOCUMENT_CROP_TOUCH_OFFSET_PX}" r="30"></circle>
             <circle class="handle-dot" r="9" fill="#fff" stroke="#11615d" stroke-width="3"></circle>
           </g>
         `).join("")}`;
@@ -1392,6 +1402,90 @@
     documentEl.cropHint.querySelector(".touch-crop-hint").textContent = `${prefix}拖曳四角調整文件範圍`;
   }
 
+  function documentCropUsesMobileLayout() {
+    return window.matchMedia("(max-width: 920px), (pointer: coarse)").matches;
+  }
+
+  function setDocumentCropPreviewOpen(open) {
+    const isOpen = Boolean(open);
+    documentEl.cropDialog.classList.toggle("document-crop-preview-open", isOpen);
+    documentEl.cropPreviewToggleBtn.setAttribute("aria-expanded", String(isOpen));
+    documentEl.cropPreviewToggleBtn.textContent = isOpen ? "返回調整裁切" : "查看校正預覽";
+  }
+
+  function documentDraggedImagePoint(clientX, clientY) {
+    if (!documentState.dragUsesRelativeMotion || !documentState.dragStart || !documentState.dragOrigin) {
+      return documentImagePoint(clientX, clientY);
+    }
+    const rect = documentEl.cropCanvas.getBoundingClientRect();
+    return {
+      x: Math.min(documentEl.cropCanvas.width, Math.max(0,
+        documentState.dragOrigin.x + (clientX - documentState.dragStart.x) * documentEl.cropCanvas.width / rect.width
+      )),
+      y: Math.min(documentEl.cropCanvas.height, Math.max(0,
+        documentState.dragOrigin.y + (clientY - documentState.dragStart.y) * documentEl.cropCanvas.height / rect.height
+      ))
+    };
+  }
+
+  function drawDocumentCropLoupe() {
+    const loupe = documentEl.cropLoupe;
+    if (!documentState.dragUsesRelativeMotion || documentState.dragHandle === null) {
+      loupe.setAttribute("aria-hidden", "true");
+      return;
+    }
+    const source = documentEl.cropCanvas;
+    const sourceRect = source.getBoundingClientRect();
+    const point = documentState.cropPoints[documentState.dragHandle];
+    const displayPoint = documentDisplayPoint(point);
+    const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
+    const outputSize = Math.round(DOCUMENT_CROP_LOUPE_SIZE_PX * pixelRatio);
+    if (loupe.width !== outputSize || loupe.height !== outputSize) {
+      loupe.width = outputSize;
+      loupe.height = outputSize;
+    }
+    const sourceWidth = DOCUMENT_CROP_LOUPE_SIZE_PX / DOCUMENT_CROP_LOUPE_ZOOM * source.width / sourceRect.width;
+    const sourceHeight = DOCUMENT_CROP_LOUPE_SIZE_PX / DOCUMENT_CROP_LOUPE_ZOOM * source.height / sourceRect.height;
+    const sourceX = point.x - sourceWidth / 2;
+    const sourceY = point.y - sourceHeight / 2;
+    const clippedX = Math.max(0, sourceX);
+    const clippedY = Math.max(0, sourceY);
+    const clippedRight = Math.min(source.width, sourceX + sourceWidth);
+    const clippedBottom = Math.min(source.height, sourceY + sourceHeight);
+    const context = loupe.getContext("2d");
+    context.clearRect(0, 0, outputSize, outputSize);
+    context.fillStyle = "#202826";
+    context.fillRect(0, 0, outputSize, outputSize);
+    if (clippedRight > clippedX && clippedBottom > clippedY) {
+      context.drawImage(
+        source,
+        clippedX,
+        clippedY,
+        clippedRight - clippedX,
+        clippedBottom - clippedY,
+        (clippedX - sourceX) / sourceWidth * outputSize,
+        (clippedY - sourceY) / sourceHeight * outputSize,
+        (clippedRight - clippedX) / sourceWidth * outputSize,
+        (clippedBottom - clippedY) / sourceHeight * outputSize
+      );
+    }
+    const center = outputSize / 2;
+    context.strokeStyle = "rgba(255, 255, 255, .95)";
+    context.lineWidth = Math.max(2, pixelRatio);
+    context.beginPath();
+    context.moveTo(center - 18 * pixelRatio, center);
+    context.lineTo(center + 18 * pixelRatio, center);
+    context.moveTo(center, center - 18 * pixelRatio);
+    context.lineTo(center, center + 18 * pixelRatio);
+    context.stroke();
+    context.fillStyle = "#30c2b3";
+    context.beginPath();
+    context.arc(center, center, 3.5 * pixelRatio, 0, Math.PI * 2);
+    context.fill();
+    loupe.classList.toggle("document-crop-loupe-lower", displayPoint.y < sourceRect.height * 0.45);
+    loupe.setAttribute("aria-hidden", "false");
+  }
+
   function setActiveDocumentHandle(index, focus = false) {
     documentState.activeHandle = index;
     documentEl.cropOverlay.querySelectorAll(".document-handle").forEach((handle, handleIndex) =>
@@ -1424,6 +1518,10 @@
     documentState.dragCaptureTarget = null;
     documentState.inputMode = null;
     documentState.dragStart = null;
+    documentState.dragOrigin = null;
+    documentState.dragUsesRelativeMotion = false;
+    documentEl.cropLoupe.setAttribute("aria-hidden", "true");
+    documentEl.cropLoupe.classList.remove("document-crop-loupe-lower");
     setDocumentDragging(false);
     if (captureTarget && pointerId !== null) {
       try {
@@ -1435,6 +1533,7 @@
   }
 
   function scheduleDocumentCropDragPreview() {
+    if (documentCropUsesMobileLayout() && !documentEl.cropDialog.classList.contains("document-crop-preview-open")) return;
     if (documentState.cropPreviewTimer !== null) return;
     const elapsed = performance.now() - documentState.cropPreviewLastAt;
     const delay = Math.max(0, DOCUMENT_CROP_PREVIEW_INTERVAL_MS - elapsed);
@@ -1448,9 +1547,10 @@
 
   function renderDocumentDraggedPoint(clientX, clientY, schedulePreview = true) {
     if (documentState.dragHandle === null) return;
-    documentState.cropPoints[documentState.dragHandle] = documentImagePoint(clientX, clientY);
+    documentState.cropPoints[documentState.dragHandle] = documentDraggedImagePoint(clientX, clientY);
     documentState.dirty = true;
     drawDocumentOverlay();
+    drawDocumentCropLoupe();
     if (schedulePreview) scheduleDocumentCropDragPreview();
   }
 
@@ -1501,11 +1601,14 @@
     documentState.dragPointerId = event.pointerId;
     documentState.dragCaptureTarget = handle;
     documentState.dragStart = { x: event.clientX, y: event.clientY };
+    documentState.dragOrigin = { ...documentState.cropPoints[documentState.dragHandle] };
+    documentState.dragUsesRelativeMotion = event.pointerType === "touch" || documentCropUsesMobileLayout();
     documentState.dragMoved = false;
     documentState.cropPreviewLastAt = 0;
     ensureDocumentCropDragPreviewSource();
     setActiveDocumentHandle(documentState.dragHandle, event.pointerType !== "touch");
     setDocumentDragging(true);
+    drawDocumentCropLoupe();
     try { handle.setPointerCapture(event.pointerId); } catch (_) { /* Synthetic input has no capture. */ }
   }, { passive: false });
 
@@ -1545,11 +1648,14 @@
     documentState.dragHandle = Number(handle.dataset.index);
     documentState.dragTouchId = touch.identifier;
     documentState.dragStart = { x: touch.clientX, y: touch.clientY };
+    documentState.dragOrigin = { ...documentState.cropPoints[documentState.dragHandle] };
+    documentState.dragUsesRelativeMotion = true;
     documentState.dragMoved = false;
     documentState.cropPreviewLastAt = 0;
     ensureDocumentCropDragPreviewSource();
     setActiveDocumentHandle(documentState.dragHandle);
     setDocumentDragging(true);
+    drawDocumentCropLoupe();
   }, { passive: false });
 
   documentEl.cropOverlay.addEventListener("touchmove", (event) => {
@@ -1605,6 +1711,9 @@
   }
 
   documentEl.nextFrameBtn.addEventListener("click", () => setDocumentCandidate(documentState.candidateIndex + 1));
+  documentEl.cropPreviewToggleBtn.addEventListener("click", () => {
+    setDocumentCropPreviewOpen(!documentEl.cropDialog.classList.contains("document-crop-preview-open"));
+  });
 
   documentEl.autoCropBtn.addEventListener("click", () => {
     const item = findDocumentItem(documentState.activeId).item;
@@ -1704,6 +1813,7 @@
     documentEl.cropDialog.close();
     renderDocumentEditor();
   });
+  documentEl.mobileApplyCropBtn.addEventListener("click", () => documentEl.applyCropBtn.click());
 
   function requestDocumentCropClose(force = false) {
     if (documentState.dirty && !force) {
@@ -1721,7 +1831,7 @@
   );
   documentEl.keepEditingBtn.addEventListener("click", () => {
     documentEl.discardPrompt.hidden = true;
-    documentEl.applyCropBtn.focus();
+    (documentCropUsesMobileLayout() ? documentEl.mobileApplyCropBtn : documentEl.applyCropBtn).focus();
   });
   documentEl.discardBtn.addEventListener("click", () => requestDocumentCropClose(true));
   documentEl.cropDialog.addEventListener("cancel", (event) => {

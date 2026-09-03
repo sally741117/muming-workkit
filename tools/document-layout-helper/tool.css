@@ -848,6 +848,10 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 .dialog-actions { justify-content: flex-end; margin-top: 12px; }
 .crop-tools { flex-wrap: wrap; margin-bottom: 12px; }
 
+.document-crop-mobile-head,
+.document-crop-preview-toggle,
+.document-crop-loupe { display: none; }
+
 .crop-dialog-title {
   display: flex;
   align-items: baseline;
@@ -952,6 +956,12 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 .handle-hit {
   fill: transparent;
   pointer-events: all;
+}
+
+.document-touch-handle-hit {
+  display: none;
+  fill: transparent;
+  pointer-events: none;
 }
 
 .handle-dot { pointer-events: none; }
@@ -1081,4 +1091,163 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   .keyboard-crop-hint { display: none; }
   .touch-crop-hint { display: inline; }
   .crop-dialog button { min-height: 44px; }
+}
+
+@media (max-width: 920px), (pointer: coarse) {
+  #documentCropDialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  #documentCropDialog .dialog-shell {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    overflow: hidden;
+  }
+
+  #documentCropDialog .document-crop-desktop-head,
+  #documentCropDialog .document-crop-desktop-actions { display: none; }
+
+  #documentCropDialog .document-crop-mobile-head {
+    display: grid;
+    grid-template-columns: minmax(72px, auto) minmax(0, 1fr) minmax(72px, auto);
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    margin-bottom: 6px;
+  }
+
+  #documentCropDialog .document-crop-mobile-head strong {
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #documentCropDialog .crop-grid {
+    order: 2;
+    flex: 1 1 auto;
+    display: block;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  #documentCropDialog .crop-source {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  #documentCropDialog .crop-stage {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    padding-bottom: 32px;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  #documentCropDialog #documentCropCanvas {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: calc(100% - 32px);
+  }
+
+  #documentCropDialog .crop-handle-hint {
+    flex: 0 0 auto;
+    min-height: 18px;
+    margin: 4px 0 0;
+    text-align: center;
+  }
+
+  #documentCropDialog .crop-tools {
+    order: 3;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    width: auto;
+    margin: 6px -8px 0;
+    padding: 6px 8px 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-top: 1px solid var(--line);
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #documentCropDialog .crop-tools button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+
+  #documentCropDialog .document-crop-preview-toggle { display: inline-flex; }
+
+  #documentCropDialog .document-crop-correction-preview {
+    display: none;
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  #documentCropDialog.document-crop-preview-open .crop-source { display: none; }
+
+  #documentCropDialog.document-crop-preview-open .document-crop-correction-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #documentCropDialog .document-crop-correction-preview h3 {
+    flex: 0 0 auto;
+    margin: 4px 0 8px;
+  }
+
+  #documentCropDialog .document-crop-correction-preview canvas {
+    width: auto;
+    max-width: 100%;
+    max-height: calc(100% - 38px);
+  }
+
+  #documentCropDialog .document-crop-loupe {
+    position: absolute;
+    z-index: 6;
+    top: 10px;
+    left: 50%;
+    display: none;
+    width: 128px;
+    height: 128px;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: #202826;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .5);
+    pointer-events: none;
+    transform: translateX(-50%);
+  }
+
+  #documentCropDialog.crop-dragging .document-crop-loupe[aria-hidden="false"] { display: block; }
+
+  #documentCropDialog .document-crop-loupe.document-crop-loupe-lower {
+    top: auto;
+    bottom: 10px;
+  }
+
+  #documentCropDialog .handle-hit { pointer-events: none; }
+
+  #documentCropDialog .document-touch-handle-hit {
+    display: block;
+    pointer-events: all;
+  }
 }
