@@ -1020,13 +1020,6 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   .case-head-actions { width: 100%; justify-content: flex-start; }
   .crop-grid { grid-template-columns: 1fr; }
   .document-editor-grid { grid-template-columns: 1fr; }
-  .document-pdf-actions {
-    order: 10;
-    margin: 14px 0 0;
-    padding: 12px 0 0;
-    border-top: 1px solid var(--line);
-    border-bottom: 0;
-  }
   .document-output-action-start { margin-left: 0; }
   .document-print-only-desktop { display: none; }
   .document-page-viewport { min-height: 0; padding: 14px; }
@@ -1085,6 +1078,7 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
   .document-resize-handle.sw { bottom: -22px; left: -22px; }
   .document-pdf-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .document-pdf-actions .primary { grid-column: span 1; }
+  .document-pdf-actions #documentSharePdfBtn { grid-column: 1 / -1; }
 }
 
 @media (pointer: coarse) {
