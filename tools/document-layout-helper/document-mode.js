@@ -31,7 +31,12 @@
     pdfWarmIdle: null,
     layoutGesture: null,
     layoutScrollY: 0,
-    pendingImport: null
+    pendingImport: null,
+    cropDragFrame: null,
+    cropDragClientPoint: null,
+    cropPreviewTimer: null,
+    cropPreviewLastAt: 0,
+    cropDragPreviewSource: null
   };
 
   const documentEl = {
@@ -87,6 +92,8 @@
   };
 
   const HANDLE_LABELS = ["左上角", "右上角", "右下角", "左下角"];
+  const DOCUMENT_CROP_PREVIEW_INTERVAL_MS = 100;
+  const DOCUMENT_CROP_DRAG_PREVIEW_MAX_EDGE = 900;
   const A4_WIDTH_MM = 210;
   const A4_HEIGHT_MM = 297;
   const DEFAULT_DOCUMENT_WIDTH_MM = 175;
@@ -1244,6 +1251,7 @@
     documentEl.cropCanvas.width = source.width;
     documentEl.cropCanvas.height = source.height;
     documentEl.cropCanvas.getContext("2d").drawImage(source, 0, 0);
+    documentState.cropDragPreviewSource = null;
   }
 
   function openDocumentCrop(itemId, opener = document.activeElement) {
@@ -1341,8 +1349,32 @@
     });
   }
 
-  function updateDocumentCropCorrectionPreview() {
-    const output = warpDocumentCanvas(documentEl.cropCanvas, documentState.cropPoints);
+  function ensureDocumentCropDragPreviewSource() {
+    const source = documentEl.cropCanvas;
+    const scale = Math.min(1, DOCUMENT_CROP_DRAG_PREVIEW_MAX_EDGE / Math.max(source.width, source.height));
+    if (!documentState.cropDragPreviewSource) {
+      const previewSource = document.createElement("canvas");
+      previewSource.width = Math.max(1, Math.round(source.width * scale));
+      previewSource.height = Math.max(1, Math.round(source.height * scale));
+      previewSource.getContext("2d").drawImage(source, 0, 0, previewSource.width, previewSource.height);
+      documentState.cropDragPreviewSource = previewSource;
+    }
+    return { source: documentState.cropDragPreviewSource, scale };
+  }
+
+  function documentCropDragPreviewInput() {
+    const { source, scale } = ensureDocumentCropDragPreviewSource();
+    return {
+      source,
+      points: documentState.cropPoints.map((point) => ({ x: point.x * scale, y: point.y * scale }))
+    };
+  }
+
+  function updateDocumentCropCorrectionPreview(useDragPreview = false) {
+    const input = useDragPreview
+      ? documentCropDragPreviewInput()
+      : { source: documentEl.cropCanvas, points: documentState.cropPoints };
+    const output = warpDocumentCanvas(input.source, input.points);
     const preview = documentEl.cropCorrectionPreviewCanvas;
     preview.width = output.width;
     preview.height = output.height;
@@ -1373,8 +1405,17 @@
     document.body.classList.toggle("crop-handle-dragging", active);
   }
 
+  function cancelDocumentCropDragUpdates() {
+    if (documentState.cropDragFrame !== null) cancelAnimationFrame(documentState.cropDragFrame);
+    if (documentState.cropPreviewTimer !== null) window.clearTimeout(documentState.cropPreviewTimer);
+    documentState.cropDragFrame = null;
+    documentState.cropDragClientPoint = null;
+    documentState.cropPreviewTimer = null;
+  }
+
   function clearDocumentDrag(pointerId = documentState.dragPointerId) {
     const captureTarget = documentState.dragCaptureTarget;
+    cancelDocumentCropDragUpdates();
     documentState.dragHandle = null;
     documentState.dragPointerId = null;
     documentState.dragTouchId = null;
@@ -1391,15 +1432,51 @@
     }
   }
 
+  function scheduleDocumentCropDragPreview() {
+    if (documentState.cropPreviewTimer !== null) return;
+    const elapsed = performance.now() - documentState.cropPreviewLastAt;
+    const delay = Math.max(0, DOCUMENT_CROP_PREVIEW_INTERVAL_MS - elapsed);
+    documentState.cropPreviewTimer = window.setTimeout(() => {
+      documentState.cropPreviewTimer = null;
+      if (documentState.dragHandle === null) return;
+      documentState.cropPreviewLastAt = performance.now();
+      updateDocumentCropCorrectionPreview(true);
+    }, delay);
+  }
+
+  function renderDocumentDraggedPoint(clientX, clientY, schedulePreview = true) {
+    if (documentState.dragHandle === null) return;
+    documentState.cropPoints[documentState.dragHandle] = documentImagePoint(clientX, clientY);
+    documentState.dirty = true;
+    drawDocumentOverlay();
+    if (schedulePreview) scheduleDocumentCropDragPreview();
+  }
+
   function updateDocumentDraggedPoint(clientX, clientY) {
     if (documentState.dragHandle === null) return;
     if (documentState.dragStart && Math.hypot(clientX - documentState.dragStart.x, clientY - documentState.dragStart.y) > 4) {
       documentState.dragMoved = true;
     }
-    documentState.cropPoints[documentState.dragHandle] = documentImagePoint(clientX, clientY);
-    documentState.dirty = true;
-    drawDocumentOverlay();
+    documentState.cropDragClientPoint = { x: clientX, y: clientY };
+    if (documentState.cropDragFrame !== null) return;
+    documentState.cropDragFrame = requestAnimationFrame(() => {
+      documentState.cropDragFrame = null;
+      const point = documentState.cropDragClientPoint;
+      documentState.cropDragClientPoint = null;
+      if (point) renderDocumentDraggedPoint(point.x, point.y);
+    });
+  }
+
+  function flushDocumentCropDragPreview() {
+    if (documentState.cropDragFrame !== null) cancelAnimationFrame(documentState.cropDragFrame);
+    documentState.cropDragFrame = null;
+    const point = documentState.cropDragClientPoint;
+    documentState.cropDragClientPoint = null;
+    if (point) renderDocumentDraggedPoint(point.x, point.y, false);
+    if (documentState.cropPreviewTimer !== null) window.clearTimeout(documentState.cropPreviewTimer);
+    documentState.cropPreviewTimer = null;
     updateDocumentCropCorrectionPreview();
+    documentState.cropPreviewLastAt = performance.now();
   }
 
   function blockDocumentTouch(event) {
@@ -1423,6 +1500,8 @@
     documentState.dragCaptureTarget = handle;
     documentState.dragStart = { x: event.clientX, y: event.clientY };
     documentState.dragMoved = false;
+    documentState.cropPreviewLastAt = 0;
+    ensureDocumentCropDragPreviewSource();
     setActiveDocumentHandle(documentState.dragHandle, event.pointerType !== "touch");
     setDocumentDragging(true);
     try { handle.setPointerCapture(event.pointerId); } catch (_) { /* Synthetic input has no capture. */ }
@@ -1439,6 +1518,8 @@
     if (documentState.inputMode !== "pointer" || event.pointerId !== documentState.dragPointerId) return;
     if (event.cancelable) event.preventDefault();
     event.stopPropagation();
+    updateDocumentDraggedPoint(event.clientX, event.clientY);
+    flushDocumentCropDragPreview();
     if (documentState.dragMoved) documentState.suppressClickUntil = performance.now() + 500;
     clearDocumentDrag(event.pointerId);
   }
@@ -1446,7 +1527,10 @@
   documentEl.cropOverlay.addEventListener("pointerup", endDocumentPointer);
   documentEl.cropOverlay.addEventListener("pointercancel", endDocumentPointer);
   documentEl.cropOverlay.addEventListener("lostpointercapture", () => {
-    if (documentState.inputMode === "pointer") clearDocumentDrag();
+    if (documentState.inputMode === "pointer") {
+      flushDocumentCropDragPreview();
+      clearDocumentDrag();
+    }
   });
 
   documentEl.cropOverlay.addEventListener("touchstart", (event) => {
@@ -1460,6 +1544,8 @@
     documentState.dragTouchId = touch.identifier;
     documentState.dragStart = { x: touch.clientX, y: touch.clientY };
     documentState.dragMoved = false;
+    documentState.cropPreviewLastAt = 0;
+    ensureDocumentCropDragPreviewSource();
     setActiveDocumentHandle(documentState.dragHandle);
     setDocumentDragging(true);
   }, { passive: false });
@@ -1477,6 +1563,9 @@
     const ended = event.type === "touchcancel"
       || Array.from(event.changedTouches).some((touch) => touch.identifier === documentState.dragTouchId);
     if (!ended) return;
+    const touch = Array.from(event.changedTouches).find((item) => item.identifier === documentState.dragTouchId);
+    if (touch) updateDocumentDraggedPoint(touch.clientX, touch.clientY);
+    flushDocumentCropDragPreview();
     if (documentState.dragMoved) documentState.suppressClickUntil = performance.now() + 500;
     clearDocumentDrag(null);
   }
