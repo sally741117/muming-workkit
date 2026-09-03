@@ -6,7 +6,7 @@
   <title>證件與文件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="證件與紙本文件自動校正、自由排版，一鍵輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260902-1">
+  <link rel="stylesheet" href="./tool.css?v=20260903-1">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -92,6 +92,15 @@
             </div>
           </div>
 
+          <div class="document-pdf-actions" aria-label="文件與頁面操作">
+            <button id="documentSelectBtn" type="button">新增文件</button>
+            <button id="documentCameraBtn" type="button">直接拍照</button>
+            <button id="documentAddPageBtn" type="button">新增頁面</button>
+            <button id="documentPdfBtn" class="primary document-output-action-start" type="button">產生 PDF</button>
+            <button id="documentSharePdfBtn" type="button">分享 PDF</button>
+            <button id="documentPrintBtn" class="document-print-only-desktop" type="button">直接列印</button>
+          </div>
+
           <div class="document-page-bar">
             <div class="document-page-navigation">
               <button id="documentPreviousPageBtn" type="button" aria-label="上一頁">←</button>
@@ -156,13 +165,6 @@
           </div>
 
           <div id="documentStatusLog" class="status-log" aria-live="polite"></div>
-          <div class="document-pdf-actions">
-            <button id="documentSelectBtn" type="button">新增文件</button>
-            <button id="documentCameraBtn" type="button">直接拍照</button>
-            <button id="documentAddPageBtn" type="button">新增頁面</button>
-            <button id="documentPdfBtn" class="primary" type="button">產生 PDF</button>
-            <button id="documentSharePdfBtn" type="button">分享 PDF</button>
-          </div>
         </section>
       </section>
     </div>
@@ -338,6 +340,6 @@
   <input id="documentCameraInput" type="file" accept="image/*" capture="environment" hidden>
 
   <script src="./app.js?v=20260902-1"></script>
-  <script src="./document-mode.js?v=20260903-2"></script>
+  <script src="./document-mode.js?v=20260903-3"></script>
 </body>
 </html>

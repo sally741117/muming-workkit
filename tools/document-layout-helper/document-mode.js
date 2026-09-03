@@ -72,6 +72,7 @@
     lockRatio: document.querySelector("#documentLockRatio"),
     pdfBtn: document.querySelector("#documentPdfBtn"),
     sharePdfBtn: document.querySelector("#documentSharePdfBtn"),
+    printBtn: document.querySelector("#documentPrintBtn"),
     cropDialog: document.querySelector("#documentCropDialog"),
     cropContext: document.querySelector("#documentCropContext"),
     cropStage: document.querySelector("#documentCropStage"),
@@ -754,6 +755,7 @@
     const hasDocuments = allDocumentItems().length > 0;
     documentEl.pdfBtn.disabled = !hasDocuments;
     documentEl.sharePdfBtn.disabled = !hasDocuments;
+    documentEl.printBtn.disabled = !hasDocuments;
     documentEl.pdfBtn.textContent = /SamsungBrowser\//i.test(navigator.userAgent) ? "下載 PDF" : "產生 PDF";
   }
 
@@ -1807,6 +1809,85 @@
       drawDocumentOverlay();
     });
   });
+
+  function buildDocumentPrintHtml() {
+    const pages = documentState.pages.map((page, pageIndex) => `
+      <section class="print-page" aria-label="第 ${pageIndex + 1} 頁">
+        ${page.documents.map((item) => `
+          <img src="${escapeDocumentHtml(item.currentDataUrl)}" alt=""
+            style="left:${item.layout.xMm}mm;top:${item.layout.yMm}mm;width:${item.layout.widthMm}mm;height:${item.layout.heightMm}mm">
+        `).join("")}
+      </section>
+    `).join("");
+    return `<!doctype html>
+      <html lang="zh-Hant">
+        <head>
+          <meta charset="utf-8">
+          <title>文件排版列印</title>
+          <style>
+            @page { size: A4; margin: 0; }
+            * { box-sizing: border-box; }
+            html, body { margin: 0; padding: 0; background: #fff; }
+            .print-page {
+              position: relative;
+              width: 210mm;
+              height: 297mm;
+              overflow: hidden;
+              break-after: page;
+              page-break-after: always;
+              background: #fff;
+            }
+            .print-page:last-child { break-after: auto; page-break-after: auto; }
+            .print-page img { position: absolute; display: block; max-width: none; }
+          </style>
+        </head>
+        <body>${pages}</body>
+      </html>`;
+  }
+
+  async function waitForDocumentPrintImages(printDocument) {
+    await Promise.all(Array.from(printDocument.images).map(async (image) => {
+      if (image.complete && image.naturalWidth > 0) return;
+      if (typeof image.decode === "function") {
+        await image.decode();
+        return;
+      }
+      await new Promise((resolve, reject) => {
+        image.addEventListener("load", resolve, { once: true });
+        image.addEventListener("error", reject, { once: true });
+      });
+    }));
+  }
+
+  async function printDocumentPages() {
+    if (!allDocumentItems().length) {
+      documentToast("請先加入文件。");
+      return;
+    }
+    const frame = document.createElement("iframe");
+    frame.title = "文件排版列印內容";
+    frame.style.cssText = "position:fixed;right:100%;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none";
+    const loaded = new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+    frame.srcdoc = buildDocumentPrintHtml();
+    document.body.appendChild(frame);
+    try {
+      await loaded;
+      await waitForDocumentPrintImages(frame.contentDocument);
+      const printWindow = frame.contentWindow;
+      const removeFrame = () => frame.remove();
+      printWindow.addEventListener("afterprint", removeFrame, { once: true });
+      printWindow.focus();
+      printWindow.print();
+      window.setTimeout(removeFrame, 300000);
+      documentLog(`已開啟 ${documentState.pages.length} 頁列印預覽`);
+    } catch (error) {
+      frame.remove();
+      console.error("Document print failed.", error);
+      documentToast("無法準備列印內容，請稍後再試。");
+    }
+  }
+
+  documentEl.printBtn.addEventListener("click", () => void printDocumentPages());
 
   function buildDocumentPdfBundle() {
     if (!allDocumentItems().length || !window.jspdf?.jsPDF) return null;
