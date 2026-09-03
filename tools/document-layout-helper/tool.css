@@ -850,7 +850,8 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 
 .document-crop-mobile-head,
 .document-crop-preview-toggle,
-.document-crop-loupe { display: none; }
+.document-crop-loupe,
+.identity-crop-loupe { display: none; }
 
 .crop-dialog-title {
   display: flex;
@@ -1088,6 +1089,67 @@ dialog::backdrop { background: rgba(20, 28, 28, .55); }
 }
 
 @media (max-width: 920px), (pointer: coarse) {
+  #cropDialog .identity-crop-loupe {
+    position: absolute;
+    z-index: 6;
+    top: max(10px, env(safe-area-inset-top));
+    left: 50%;
+    display: block;
+    width: 128px;
+    height: 128px;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: #202826;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .5);
+    visibility: hidden;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transform: translateX(-50%);
+  }
+
+  #cropDialog.crop-dragging .identity-crop-loupe[aria-hidden="false"] {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  #cropDialog .identity-crop-loupe canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  #cropDialog .identity-crop-loupe::before,
+  #cropDialog .identity-crop-loupe::after {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 50%;
+    content: "";
+    background: rgba(255, 255, 255, .95);
+    transform: translate(-50%, -50%);
+  }
+
+  #cropDialog .identity-crop-loupe::before { width: 36px; height: 2px; }
+  #cropDialog .identity-crop-loupe::after { width: 2px; height: 36px; }
+
+  #cropDialog .identity-crop-loupe-point {
+    position: absolute;
+    z-index: 2;
+    top: 50%;
+    left: 50%;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #30c2b3;
+    transform: translate(-50%, -50%);
+  }
+
+  #cropDialog .identity-crop-loupe.identity-crop-loupe-lower {
+    top: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
   #documentCropDialog {
     width: 100vw;
     max-width: 100vw;

@@ -3,6 +3,8 @@ const CARD_W_MM = 85;
 const CARD_H_MM = 54;
 const A4_W = 210;
 const A4_H = 297;
+const IDENTITY_CROP_LOUPE_SIZE_PX = 128;
+const IDENTITY_CROP_LOUPE_ZOOM = 3;
 const TOOL_CANONICAL_URL = "https://sally741117.github.io/muming-workkit/tools/document-layout-helper/";
 const TOOL_ANDROID_EXTERNAL_URL = `${TOOL_CANONICAL_URL}?openExternalBrowser=1`;
 const state = {
@@ -22,6 +24,8 @@ const state = {
   cropRestoreFocus: true,
   cropFocusBeforeDiscard: null,
   cropPageScrollY: 0,
+  cropLoupeSource: null,
+  cropLoupeDisplaySize: null,
   viewerId: null,
   viewerMode: "original",
   slotChoice: null,
@@ -62,6 +66,8 @@ const el = {
   cropAssignmentContext: document.querySelector("#cropAssignmentContext"),
   cropCanvas: document.querySelector("#cropCanvas"),
   cropOverlay: document.querySelector("#cropOverlay"),
+  cropLoupe: document.querySelector("#identityCropLoupe"),
+  cropLoupeCanvas: document.querySelector("#identityCropLoupeCanvas"),
   cropHandleHint: document.querySelector("#cropHandleHint"),
   cropCorrectionPreviewCanvas: document.querySelector("#cropCorrectionPreviewCanvas"),
   autoCropBtn: document.querySelector("#autoCropBtn"),
@@ -2106,6 +2112,8 @@ async function openCrop(cardId, opener = document.activeElement) {
   el.cropDialog.showModal();
   requestAnimationFrame(() => {
     fitOverlay();
+    prepareIdentityCropLoupeSource();
+    prewarmIdentityCropLoupe();
     updateNextFrameButton();
     drawCropOverlay();
     updateCropCorrectionPreview();
@@ -2175,6 +2183,7 @@ function applyCropCandidateToCard(candidateIndex = state.cropCandidateIndex) {
 function fitOverlay() {
   const rect = el.cropCanvas.getBoundingClientRect();
   el.cropOverlay.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+  state.cropLoupeDisplaySize = { width: rect.width, height: rect.height };
 }
 
 function displayPoint(point) {
@@ -2220,6 +2229,10 @@ let activeCropInputMode = null;
 let cropDragStart = null;
 let cropDragMoved = false;
 let suppressCropClickUntil = 0;
+let cropDragFrame = null;
+let cropDragClientPoint = null;
+let cropDragUsesLoupe = false;
+let cropReleasePreviewFrame = null;
 const cropHandleLabels = ["左上角", "右上角", "右下角", "左下角"];
 
 function setCropDragging(active) {
@@ -2228,14 +2241,124 @@ function setCropDragging(active) {
   document.body.classList.toggle("crop-handle-dragging", active);
 }
 
+function identityCropUsesMobileLayout() {
+  return window.matchMedia("(max-width: 920px), (pointer: coarse)").matches;
+}
+
+function prepareIdentityCropLoupeSource() {
+  const output = el.cropLoupeCanvas;
+  const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
+  const outputSize = Math.round(IDENTITY_CROP_LOUPE_SIZE_PX * pixelRatio);
+  if (output.width !== outputSize || output.height !== outputSize) {
+    output.width = outputSize;
+    output.height = outputSize;
+  }
+  state.cropLoupeSource = el.cropCanvas;
+  const rect = el.cropCanvas.getBoundingClientRect();
+  state.cropLoupeDisplaySize = { width: rect.width, height: rect.height };
+  const context = output.getContext("2d");
+  context.fillStyle = "#202826";
+  context.fillRect(0, 0, output.width, output.height);
+  hideIdentityCropLoupe();
+}
+
+function hideIdentityCropLoupe() {
+  el.cropLoupe.setAttribute("aria-hidden", "true");
+}
+
+function releaseIdentityCropLoupe() {
+  cancelIdentityCropDragUpdates();
+  cancelIdentityCropReleasePreview();
+  hideIdentityCropLoupe();
+  el.cropLoupe.classList.remove("identity-crop-loupe-lower");
+  const output = el.cropLoupeCanvas;
+  output.getContext("2d").clearRect(0, 0, output.width, output.height);
+  state.cropLoupeSource = null;
+  state.cropLoupeDisplaySize = null;
+  cropDragUsesLoupe = false;
+}
+
+function renderIdentityCropLoupe(point, reveal = true) {
+  const source = state.cropLoupeSource;
+  const displaySize = state.cropLoupeDisplaySize;
+  if (!source || !point || !displaySize?.width || !displaySize?.height) return;
+  const output = el.cropLoupeCanvas;
+  const outputSize = output.width;
+  const sourceWidth = IDENTITY_CROP_LOUPE_SIZE_PX / IDENTITY_CROP_LOUPE_ZOOM * source.width / displaySize.width;
+  const sourceHeight = IDENTITY_CROP_LOUPE_SIZE_PX / IDENTITY_CROP_LOUPE_ZOOM * source.height / displaySize.height;
+  const sourceX = point.x - sourceWidth / 2;
+  const sourceY = point.y - sourceHeight / 2;
+  const clippedX = Math.max(0, sourceX);
+  const clippedY = Math.max(0, sourceY);
+  const clippedRight = Math.min(source.width, sourceX + sourceWidth);
+  const clippedBottom = Math.min(source.height, sourceY + sourceHeight);
+  const context = output.getContext("2d");
+  context.clearRect(0, 0, outputSize, outputSize);
+  context.fillStyle = "#202826";
+  context.fillRect(0, 0, outputSize, outputSize);
+  if (clippedRight > clippedX && clippedBottom > clippedY) {
+    context.drawImage(
+      source,
+      clippedX,
+      clippedY,
+      clippedRight - clippedX,
+      clippedBottom - clippedY,
+      (clippedX - sourceX) / sourceWidth * outputSize,
+      (clippedY - sourceY) / sourceHeight * outputSize,
+      (clippedRight - clippedX) / sourceWidth * outputSize,
+      (clippedBottom - clippedY) / sourceHeight * outputSize
+    );
+  }
+  el.cropLoupe.classList.toggle("identity-crop-loupe-lower", point.y < source.height * 0.45);
+  if (reveal) el.cropLoupe.setAttribute("aria-hidden", "false");
+}
+
+function prewarmIdentityCropLoupe() {
+  if (!identityCropUsesMobileLayout()) return;
+  renderIdentityCropLoupe(state.cropPoints[0], false);
+}
+
+function drawIdentityCropLoupe() {
+  if (!cropDragUsesLoupe || draggingHandle === null) {
+    hideIdentityCropLoupe();
+    return;
+  }
+  renderIdentityCropLoupe(state.cropPoints[draggingHandle]);
+}
+
+function cancelIdentityCropDragUpdates() {
+  if (cropDragFrame !== null) cancelAnimationFrame(cropDragFrame);
+  cropDragFrame = null;
+  cropDragClientPoint = null;
+}
+
+function cancelIdentityCropReleasePreview() {
+  if (cropReleasePreviewFrame !== null) cancelAnimationFrame(cropReleasePreviewFrame);
+  cropReleasePreviewFrame = null;
+}
+
+function scheduleIdentityCropReleasePreview() {
+  cancelIdentityCropReleasePreview();
+  cropReleasePreviewFrame = requestAnimationFrame(() => {
+    cropReleasePreviewFrame = requestAnimationFrame(() => {
+      cropReleasePreviewFrame = null;
+      if (el.cropDialog.open) updateCropCorrectionPreview();
+    });
+  });
+}
+
 function clearCropPointerDrag(pointerId = draggingPointerId) {
   const captureTarget = draggingCaptureTarget;
+  cancelIdentityCropDragUpdates();
   draggingHandle = null;
   draggingPointerId = null;
   draggingCaptureTarget = null;
   draggingTouchId = null;
   activeCropInputMode = null;
   cropDragStart = null;
+  hideIdentityCropLoupe();
+  el.cropLoupe.classList.remove("identity-crop-loupe-lower");
+  cropDragUsesLoupe = false;
   setCropDragging(false);
   if (captureTarget && pointerId !== null) {
     try {
@@ -2284,17 +2407,44 @@ function moveActiveCropHandle(key, fast = false) {
   updateCropCorrectionPreview();
 }
 
-function updateDraggedCropPoint(clientX, clientY) {
+function renderDraggedCropPoint(clientX, clientY, updatePreview = true) {
   if (draggingHandle === null) return;
-  if (cropDragStart && Math.hypot(clientX - cropDragStart.x, clientY - cropDragStart.y) > 4) {
-    cropDragMoved = true;
-  }
   const rect = el.cropCanvas.getBoundingClientRect();
   state.cropPoints[draggingHandle] = imagePoint({ x: clientX - rect.left, y: clientY - rect.top });
   state.cropDirty = true;
   state.cropManuallyAdjusted = true;
   drawCropOverlay();
-  updateCropCorrectionPreview();
+  drawIdentityCropLoupe();
+  if (updatePreview) updateCropCorrectionPreview();
+}
+
+function updateDraggedCropPoint(clientX, clientY) {
+  if (draggingHandle === null) return;
+  if (cropDragStart && Math.hypot(clientX - cropDragStart.x, clientY - cropDragStart.y) > 4) {
+    cropDragMoved = true;
+  }
+  if (!cropDragUsesLoupe) {
+    renderDraggedCropPoint(clientX, clientY);
+    return;
+  }
+  cropDragClientPoint = { x: clientX, y: clientY };
+  if (cropDragFrame !== null) return;
+  cropDragFrame = requestAnimationFrame(() => {
+    cropDragFrame = null;
+    const point = cropDragClientPoint;
+    cropDragClientPoint = null;
+    if (point) renderDraggedCropPoint(point.x, point.y, false);
+  });
+}
+
+function flushIdentityCropDragUpdates() {
+  if (cropDragFrame !== null) cancelAnimationFrame(cropDragFrame);
+  cropDragFrame = null;
+  const point = cropDragClientPoint;
+  cropDragClientPoint = null;
+  if (point) renderDraggedCropPoint(point.x, point.y, false);
+  hideIdentityCropLoupe();
+  if (cropDragUsesLoupe) scheduleIdentityCropReleasePreview();
 }
 
 function blockCropSurfaceTouch(event) {
@@ -2337,14 +2487,17 @@ identityCropStage.addEventListener("pointerdown", (event) => {
   if (event.cancelable) event.preventDefault();
   event.stopPropagation();
   if (activeCropInputMode === "touch" || draggingHandle !== null) return;
+  cancelIdentityCropReleasePreview();
   activeCropInputMode = "pointer";
   draggingHandle = Number(handle.dataset.index);
   draggingPointerId = event.pointerId;
   draggingCaptureTarget = handle;
   cropDragStart = { x: event.clientX, y: event.clientY };
   cropDragMoved = false;
+  cropDragUsesLoupe = coarsePointer;
   setActiveCropHandle(draggingHandle, event.pointerType !== "touch");
   setCropDragging(true);
+  drawIdentityCropLoupe();
   try {
     handle.setPointerCapture(event.pointerId);
   } catch (_) {
@@ -2362,13 +2515,17 @@ function endCropPointer(event) {
   if (event.cancelable) event.preventDefault();
   event.stopPropagation();
   if (cropDragMoved) suppressCropClickUntil = performance.now() + 500;
+  flushIdentityCropDragUpdates();
   clearCropPointerDrag(event.pointerId);
 }
 
 identityCropStage.addEventListener("pointerup", endCropPointer);
 identityCropStage.addEventListener("pointercancel", endCropPointer);
 identityCropStage.addEventListener("lostpointercapture", () => {
-  if (activeCropInputMode === "pointer" && draggingHandle !== null) clearCropPointerDrag();
+  if (activeCropInputMode === "pointer" && draggingHandle !== null) {
+    flushIdentityCropDragUpdates();
+    clearCropPointerDrag();
+  }
 });
 identityCropStage.addEventListener("touchstart", (event) => {
   blockCropSurfaceTouch(event);
@@ -2376,13 +2533,16 @@ identityCropStage.addEventListener("touchstart", (event) => {
   if (!touch) return;
   const handle = cropHandleFromInput({ target: event.target, clientX: touch.clientX, clientY: touch.clientY }, true);
   if (!handle || activeCropInputMode === "pointer" || draggingHandle !== null) return;
+  cancelIdentityCropReleasePreview();
   activeCropInputMode = "touch";
   draggingHandle = Number(handle.dataset.index);
   draggingTouchId = touch.identifier;
   cropDragStart = { x: touch.clientX, y: touch.clientY };
   cropDragMoved = false;
+  cropDragUsesLoupe = true;
   setActiveCropHandle(draggingHandle);
   setCropDragging(true);
+  drawIdentityCropLoupe();
 }, { passive: false });
 identityCropStage.addEventListener("touchmove", (event) => {
   blockCropSurfaceTouch(event);
@@ -2398,6 +2558,7 @@ function endCropTouch(event) {
     || Array.from(event.changedTouches).some((touch) => touch.identifier === draggingTouchId);
   if (!ended) return;
   if (cropDragMoved) suppressCropClickUntil = performance.now() + 500;
+  flushIdentityCropDragUpdates();
   clearCropPointerDrag(null);
 }
 identityCropStage.addEventListener("touchend", endCropTouch, { passive: false });
@@ -2638,6 +2799,7 @@ el.cropDialog.addEventListener("close", () => {
   const cardId = state.activeCropId;
   const shouldRestore = state.cropRestoreFocus;
   clearCropPointerDrag();
+  releaseIdentityCropLoupe();
   unlockCropBackground();
   state.activeCropId = null;
   state.cropOpener = null;
