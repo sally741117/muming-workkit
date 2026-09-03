@@ -969,19 +969,21 @@
   }
 
   function beginDocumentLayoutGesture(target, clientX, clientY, inputMode, pointerId = null, touchId = null, lockScroll = false) {
-    const itemNode = target.closest("[data-document-id]");
-    if (!itemNode || documentState.layoutGesture) return;
+    const resizeHandle = target.closest("[data-layout-resize]");
+    const itemNode = resizeHandle?.closest("[data-document-id]") || target.closest("[data-document-id]");
+    if (!itemNode || documentState.layoutGesture) return null;
     const item = findDocumentItem(itemNode.dataset.documentId).item;
-    if (!item) return;
+    if (!item) return null;
     documentState.selectedItemId = item.id;
     documentEl.pageItems.querySelectorAll(".document-layout-item.selected").forEach((node) => node.classList.remove("selected"));
     itemNode.classList.add("selected");
-    const resize = target.closest("[data-layout-resize]")?.dataset.layoutResize || "move";
+    const resize = resizeHandle?.dataset.layoutResize || "move";
     documentState.layoutGesture = {
       inputMode,
       pointerId,
       touchId,
       target: itemNode,
+      captureTarget: resizeHandle || itemNode,
       item,
       mode: resize,
       startX: clientX,
@@ -993,6 +995,7 @@
     };
     if (lockScroll) lockDocumentLayoutScroll();
     renderDocumentInspector();
+    return documentState.layoutGesture;
   }
 
   function updateDocumentLayoutGestureFromClient(clientX, clientY) {
@@ -1050,9 +1053,10 @@
 
   function startDocumentLayoutGesture(event) {
     if (!event.target.closest("[data-document-id]")) return;
+    if (event.pointerType === "touch" && !event.isPrimary) return;
     event.preventDefault();
     event.stopPropagation();
-    beginDocumentLayoutGesture(
+    const gesture = beginDocumentLayoutGesture(
       event.target,
       event.clientX,
       event.clientY,
@@ -1061,9 +1065,8 @@
       null,
       event.pointerType === "touch"
     );
-    const gesture = documentState.layoutGesture;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
-    try { gesture.target.setPointerCapture(event.pointerId); } catch (_) { /* Synthetic events do not capture. */ }
+    try { gesture.captureTarget.setPointerCapture(event.pointerId); } catch (_) { /* Synthetic events do not capture. */ }
   }
 
   function updateDocumentLayoutGesture(event) {
@@ -1079,7 +1082,7 @@
     if (!gesture || gesture.inputMode !== "pointer" || event.pointerId !== gesture.pointerId) return;
     event.preventDefault();
     try {
-      if (gesture.target.hasPointerCapture(event.pointerId)) gesture.target.releasePointerCapture(event.pointerId);
+      if (gesture.captureTarget.hasPointerCapture(event.pointerId)) gesture.captureTarget.releasePointerCapture(event.pointerId);
     } catch (_) { /* Capture may already be released. */ }
     finishDocumentLayoutGesture();
   }
@@ -1089,6 +1092,7 @@
   }
 
   documentEl.pageItems.addEventListener("touchstart", (event) => {
+    if (typeof window.PointerEvent === "function") return;
     const itemNode = event.target.closest("[data-document-id]");
     if (!itemNode) return;
     event.preventDefault();
@@ -1100,6 +1104,7 @@
   }, { passive: false });
 
   documentEl.pageItems.addEventListener("touchmove", (event) => {
+    if (typeof window.PointerEvent === "function") return;
     const gesture = documentState.layoutGesture;
     if (!gesture || gesture.inputMode !== "touch") return;
     const touch = findLayoutTouch(event, gesture.touchId);
@@ -1110,6 +1115,7 @@
   }, { passive: false });
 
   ["touchend", "touchcancel"].forEach((type) => documentEl.pageItems.addEventListener(type, (event) => {
+    if (typeof window.PointerEvent === "function") return;
     const gesture = documentState.layoutGesture;
     if (!gesture || gesture.inputMode !== "touch") return;
     if (!findLayoutTouch(event, gesture.touchId)) return;
@@ -1122,6 +1128,11 @@
   documentEl.pageItems.addEventListener("pointermove", updateDocumentLayoutGesture, { passive: false });
   documentEl.pageItems.addEventListener("pointerup", endDocumentLayoutGesture, { passive: false });
   documentEl.pageItems.addEventListener("pointercancel", endDocumentLayoutGesture, { passive: false });
+  documentEl.pageItems.addEventListener("lostpointercapture", (event) => {
+    const gesture = documentState.layoutGesture;
+    if (!gesture || gesture.inputMode !== "pointer" || event.pointerId !== gesture.pointerId) return;
+    finishDocumentLayoutGesture();
+  });
 
   documentEl.pageItems.addEventListener("keydown", (event) => {
     const itemNode = event.target.closest("[data-document-id]");
