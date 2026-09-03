@@ -6,7 +6,7 @@
   <title>證件與文件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="證件與紙本文件自動校正、自由排版，一鍵輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260903-2">
+  <link rel="stylesheet" href="./tool.css?v=20260903-3">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -311,7 +311,10 @@
           <div id="documentCropStage" class="crop-stage">
             <canvas id="documentCropCanvas" tabindex="0" aria-label="文件裁切影像"></canvas>
             <svg id="documentCropOverlay"></svg>
-            <canvas id="documentCropLoupe" class="document-crop-loupe" aria-hidden="true"></canvas>
+            <div id="documentCropLoupe" class="document-crop-loupe" aria-hidden="true">
+              <canvas id="documentCropLoupeCanvas" width="256" height="256" aria-hidden="true"></canvas>
+              <span class="document-crop-loupe-point" aria-hidden="true"></span>
+            </div>
           </div>
           <p id="documentCropHint" class="crop-handle-hint">
             <span class="keyboard-crop-hint">使用方向鍵微調，Shift＋方向鍵快速移動</span>
@@ -347,6 +350,6 @@
   <input id="documentCameraInput" type="file" accept="image/*" capture="environment" hidden>
 
   <script src="./app.js?v=20260902-1"></script>
-  <script src="./document-mode.js?v=20260903-4"></script>
+  <script src="./document-mode.js?v=20260903-5"></script>
 </body>
 </html>
