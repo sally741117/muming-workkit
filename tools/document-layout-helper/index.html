@@ -6,7 +6,7 @@
   <title>證件與文件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="證件與紙本文件自動校正、自由排版，一鍵輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260903-6">
+  <link rel="stylesheet" href="./tool.css?v=20260903-7">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -129,21 +129,27 @@
                   <strong id="documentSelectedName">文件</strong>
                   <span id="documentSelectedStatus" class="document-status"></span>
                 </div>
-                <div class="document-ratio-control">
-                  <label class="document-ratio-lock">
-                    <input id="documentLockRatio" type="checkbox" checked>
-                    鎖定比例
-                  </label>
+                <div class="document-operation-controls" aria-label="功能操作">
+                  <span class="document-control-label">功能操作</span>
+                  <div class="document-quick-layout" aria-label="快速排版">
+                    <button type="button" data-document-quick-layout="full">滿版</button>
+                  </div>
+                  <div class="document-inspector-actions">
+                    <button type="button" data-selected-document-action="crop">調整裁切</button>
+                    <button type="button" data-selected-document-action="redetect">重新自動裁切</button>
+                    <button type="button" data-selected-document-action="rotate-left">左轉</button>
+                    <button type="button" data-selected-document-action="rotate-right">右轉</button>
+                    <button class="danger-quiet" type="button" data-selected-document-action="delete">刪除</button>
+                  </div>
                 </div>
-                <div class="document-inspector-actions">
-                  <button type="button" data-selected-document-action="crop">調整裁切</button>
-                  <button type="button" data-selected-document-action="redetect">重新自動裁切</button>
-                  <button type="button" data-selected-document-action="rotate-left">左轉</button>
-                  <button type="button" data-selected-document-action="rotate-right">右轉</button>
-                  <button class="danger-quiet" type="button" data-selected-document-action="delete">刪除</button>
-                </div>
-                <div class="document-quick-layout" aria-label="快速排版">
-                  <button type="button" data-document-quick-layout="full">滿版</button>
+                <div class="document-adjustment-controls" aria-label="文件調整">
+                  <span class="document-control-label">文件調整</span>
+                  <div class="document-ratio-control">
+                    <label class="document-ratio-lock">
+                      <input id="documentLockRatio" type="checkbox" checked>
+                      鎖定比例
+                    </label>
+                  </div>
                 </div>
               </div>
             </aside>
