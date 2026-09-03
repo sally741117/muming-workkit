@@ -1161,8 +1161,12 @@
     const item = selectedDocumentItem();
     if (quickLayoutButton && item) {
       const action = quickLayoutButton.dataset.documentQuickLayout;
-      if (action === "horizontal" || action === "center") item.layout.xMm = (A4_WIDTH_MM - item.layout.widthMm) / 2;
-      if (action === "vertical" || action === "center") item.layout.yMm = (A4_HEIGHT_MM - item.layout.heightMm) / 2;
+      if (action === "full") {
+        item.layout.widthMm = A4_WIDTH_MM;
+        item.layout.heightMm = A4_HEIGHT_MM;
+        item.layout.xMm = 0;
+        item.layout.yMm = 0;
+      }
       if (action === "fit") {
         const marginMm = 10;
         const availableWidth = A4_WIDTH_MM - marginMm * 2;
