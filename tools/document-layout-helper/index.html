@@ -6,7 +6,7 @@
   <title>證件與文件排版小幫手 | MUMING WorkKit</title>
   <meta name="description" content="證件與紙本文件自動校正、自由排版，一鍵輸出 PDF。">
   <link rel="canonical" href="https://sally741117.github.io/muming-workkit/tools/document-layout-helper/">
-  <link rel="stylesheet" href="./tool.css?v=20260903-5">
+  <link rel="stylesheet" href="./tool.css?v=20260903-6">
   <script src="./vendor/pdf.min.js"></script>
   <script async src="./vendor/opencv.js"></script>
   <script src="./vendor/jspdf.umd.min.js"></script>
@@ -129,19 +129,7 @@
                   <strong id="documentSelectedName">文件</strong>
                   <span id="documentSelectedStatus" class="document-status"></span>
                 </div>
-                <div class="document-size-controls">
-                  <label>寬度
-                    <span><input id="documentWidthCm" type="number" min="1" max="21" step="0.1" inputmode="decimal"> cm</span>
-                  </label>
-                  <label>高度
-                    <span><input id="documentHeightCm" type="number" min="1" max="29.7" step="0.1" inputmode="decimal"> cm</span>
-                  </label>
-                  <label>距左
-                    <span><input id="documentLeftCm" type="number" min="0" max="21" step="0.1" inputmode="decimal"> cm</span>
-                  </label>
-                  <label>距上
-                    <span><input id="documentTopCm" type="number" min="0" max="29.7" step="0.1" inputmode="decimal"> cm</span>
-                  </label>
+                <div class="document-ratio-control">
                   <label class="document-ratio-lock">
                     <input id="documentLockRatio" type="checkbox" checked>
                     鎖定比例
@@ -156,7 +144,6 @@
                 </div>
                 <div class="document-quick-layout" aria-label="快速排版">
                   <button type="button" data-document-quick-layout="full">滿版</button>
-                  <button type="button" data-document-quick-layout="fit">適合頁面</button>
                 </div>
               </div>
             </aside>
@@ -352,6 +339,6 @@
   <input id="documentCameraInput" type="file" accept="image/*" capture="environment" hidden>
 
   <script src="./app.js?v=20260903-1"></script>
-  <script src="./document-mode.js?v=20260903-7"></script>
+  <script src="./document-mode.js?v=20260903-8"></script>
 </body>
 </html>

@@ -70,10 +70,6 @@
     selectionControls: document.querySelector("#documentSelectionControls"),
     selectedName: document.querySelector("#documentSelectedName"),
     selectedStatus: document.querySelector("#documentSelectedStatus"),
-    widthCm: document.querySelector("#documentWidthCm"),
-    heightCm: document.querySelector("#documentHeightCm"),
-    leftCm: document.querySelector("#documentLeftCm"),
-    topCm: document.querySelector("#documentTopCm"),
     lockRatio: document.querySelector("#documentLockRatio"),
     pdfBtn: document.querySelector("#documentPdfBtn"),
     sharePdfBtn: document.querySelector("#documentSharePdfBtn"),
@@ -780,10 +776,6 @@
     documentEl.selectedName.textContent = selected.name;
     documentEl.selectedStatus.textContent = selected.status;
     documentEl.selectedStatus.classList.toggle("warn", !(selected.autoDetected || selected.manuallyAdjusted));
-    documentEl.widthCm.value = (selected.layout.widthMm / 10).toFixed(1);
-    documentEl.heightCm.value = (selected.layout.heightMm / 10).toFixed(1);
-    documentEl.leftCm.value = (selected.layout.xMm / 10).toFixed(1);
-    documentEl.topCm.value = (selected.layout.yMm / 10).toFixed(1);
     documentEl.lockRatio.checked = selected.layout.lockRatio;
   }
 
@@ -1167,22 +1159,6 @@
         item.layout.xMm = 0;
         item.layout.yMm = 0;
       }
-      if (action === "fit") {
-        const marginMm = 10;
-        const availableWidth = A4_WIDTH_MM - marginMm * 2;
-        const availableHeight = A4_HEIGHT_MM - marginMm * 2;
-        const ratio = item.currentCanvas.width / Math.max(1, item.currentCanvas.height);
-        let widthMm = availableWidth;
-        let heightMm = widthMm / ratio;
-        if (heightMm > availableHeight) {
-          heightMm = availableHeight;
-          widthMm = heightMm * ratio;
-        }
-        item.layout.widthMm = widthMm;
-        item.layout.heightMm = heightMm;
-        item.layout.xMm = (A4_WIDTH_MM - widthMm) / 2;
-        item.layout.yMm = (A4_HEIGHT_MM - heightMm) / 2;
-      }
       clampDocumentLayout(item);
       invalidateDocumentPdf();
       updateDocumentLayoutElement(item);
@@ -1198,41 +1174,6 @@
     if (action === "delete") deletePlacedDocument(item);
   });
 
-  function applyDocumentSizeInput(changedAxis) {
-    const item = selectedDocumentItem();
-    if (!item) return;
-    const width = Number(documentEl.widthCm.value);
-    const height = Number(documentEl.heightCm.value);
-    const ratio = item.layout.widthMm / Math.max(1, item.layout.heightMm);
-    if (changedAxis === "width" && Number.isFinite(width)) {
-      item.layout.widthMm = width * 10;
-      if (item.layout.lockRatio) item.layout.heightMm = item.layout.widthMm / ratio;
-    }
-    if (changedAxis === "height" && Number.isFinite(height)) {
-      item.layout.heightMm = height * 10;
-      if (item.layout.lockRatio) item.layout.widthMm = item.layout.heightMm * ratio;
-    }
-    clampDocumentLayout(item, item.layout.lockRatio);
-    invalidateDocumentPdf();
-    updateDocumentLayoutElement(item);
-  }
-
-  documentEl.widthCm.addEventListener("input", () => applyDocumentSizeInput("width"));
-  documentEl.heightCm.addEventListener("input", () => applyDocumentSizeInput("height"));
-  function applyDocumentPositionInput(axis) {
-    const item = selectedDocumentItem();
-    if (!item) return;
-    const value = Number(axis === "x" ? documentEl.leftCm.value : documentEl.topCm.value);
-    if (!Number.isFinite(value)) return;
-    if (axis === "x") item.layout.xMm = value * 10;
-    else item.layout.yMm = value * 10;
-    clampDocumentLayout(item);
-    invalidateDocumentPdf();
-    updateDocumentLayoutElement(item);
-  }
-
-  documentEl.leftCm.addEventListener("input", () => applyDocumentPositionInput("x"));
-  documentEl.topCm.addEventListener("input", () => applyDocumentPositionInput("y"));
   documentEl.lockRatio.addEventListener("change", () => {
     const item = selectedDocumentItem();
     if (!item) return;
